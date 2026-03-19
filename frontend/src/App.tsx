@@ -3,7 +3,7 @@ import { Toaster } from 'react-hot-toast'
 import { useState } from 'react'
 import {
   LayoutDashboard, Package, ClipboardList, BarChart3, FileText,
-  Settings, Building2, TrendingUp, Plus, Banknote, CreditCard,
+  Building2, TrendingUp, Plus, Banknote, CreditCard,
   ArrowUpRight, ArrowDownLeft, Calendar, Users, DollarSign,
   ShoppingBag, Receipt, AlertTriangle,
 } from 'lucide-react'

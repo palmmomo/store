@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { statsApi } from '../api/client'
-import { SalesChartData } from '../types'
+import type { SalesChartData } from '../types'
 
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(v)
@@ -41,7 +41,7 @@ export default function StatsPage() {
                 tickFormatter={(v) => `${(v/1000).toFixed(0)}k`} />
               <Tooltip
                 contentStyle={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }}
-                formatter={(v: number) => [formatCurrency(v), 'รายได้']}
+                formatter={(v: any) => [formatCurrency(v as number), 'รายได้']}
               />
               <Bar dataKey="revenue" fill="#6366f1" radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -57,7 +57,7 @@ export default function StatsPage() {
               <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} />
               <Tooltip
                 contentStyle={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }}
-                formatter={(v: number) => [v, 'ออเดอร์']}
+                formatter={(v: any) => [v, 'ออเดอร์']}
               />
               <Bar dataKey="orders" fill="#10b981" radius={[4, 4, 0, 0]} />
             </BarChart>

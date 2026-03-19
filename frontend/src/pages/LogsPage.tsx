@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { stockApi } from '../api/client'
-import { StockLog } from '../types'
+import type { StockLog } from '../types'
 import { FileText, TrendingUp, TrendingDown } from 'lucide-react'
 
 export default function LogsPage() {

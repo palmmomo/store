@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { orderApi } from '../api/client'
-import { Order } from '../types'
+import type { Order } from '../types'
 import { ClipboardList, ChevronDown, ChevronUp } from 'lucide-react'
 
 const formatCurrency = (v: number) =>

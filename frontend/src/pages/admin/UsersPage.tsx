@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { adminApi, branchApi } from '../../api/client'
-import { Branch } from '../../types'
+import type { Branch } from '../../types'
 import { Users, Plus, Pencil, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 

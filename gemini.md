@@ -179,12 +179,10 @@ create table order_items (
 
 ## การเปลี่ยนแปลง / Activity Log
 
-### 2026-03-20 — Initial Setup
-- สร้าง Golang backend (Gin + JWT + Supabase REST client)
-- Handler ครบ: auth, branches, products, stock, orders, stats, admin
-- สร้าง React frontend (Vite + TypeScript)
-- Dark theme CSS design system
-- หน้าทั้งหมด: Login, Dashboard, Stock, POS, Orders, Stats, Summary, Logs
-- Admin pages: Branch management, User management
-- Auth: บังคับ login ก่อนใช้งาน, role-based route protection
-- Security: .env ไม่ commit, Service Key ใน backend เท่านั้น
+### 2026-03-20 — Redesign & Transaction System
+- ปรับเปลี่ยนระบบหลักจาก POS เป็น **ระบบบันทึกรายการซื้อ-ขายประจำวัน (Transaction Recording)**
+- เปลี่ยนธีมจาก Dark เป็น **Light/White Theme** สไตล์มินิมอลตามความต้องการลูกค้า
+- นำ Emoji ออกทั้งหมด และเปลี่ยนมาใช้ **Lucide Icons** แทน
+- เพิ่มฟีเจอร์บันทึกช่องทางชำระเงิน (เงินสด/เงินโอน)
+- สร้างไฟล์ `vercel.json` และคู่มือการ Deployment สำหรับ Vercel
+- อัปเดต Task Checklist และ Implementation Plan ให้เป็นปัจจุบัน

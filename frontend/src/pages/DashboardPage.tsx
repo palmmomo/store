@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
 import { TrendingUp, ShoppingCart, Package, AlertTriangle, DollarSign, BarChart2 } from 'lucide-react'
 import { statsApi } from '../api/client'
-import { DashboardStats, SalesChartData } from '../types'
+import type { DashboardStats, SalesChartData } from '../types'
 
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(v)
@@ -78,7 +78,7 @@ export default function DashboardPage() {
             <Tooltip
               contentStyle={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }}
               labelStyle={{ color: '#94a3b8' }}
-              formatter={(v: number) => [formatCurrency(v), 'รายได้']}
+              formatter={(v: any) => [formatCurrency(v as number), 'รายได้']}
             />
             <Line type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={2} dot={false} />
           </LineChart>
@@ -98,7 +98,7 @@ export default function DashboardPage() {
               <Tooltip
                 contentStyle={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }}
                 labelStyle={{ color: '#94a3b8' }}
-                formatter={(v: number) => [v, 'ออเดอร์']}
+                formatter={(v: any) => [v, 'ออเดอร์']}
               />
               <Bar dataKey="orders" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
             </BarChart>

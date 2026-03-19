@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { branchApi } from '../../api/client'
-import { Branch } from '../../types'
+import type { Branch } from '../../types'
 import { Building2, Plus, Pencil, PowerOff } from 'lucide-react'
 import toast from 'react-hot-toast'
 

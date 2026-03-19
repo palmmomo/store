@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { stockApi, productApi } from '../api/client'
-import { StockItem, Product } from '../types'
+import type { StockItem, Product } from '../types'
 import { Package, Plus, TrendingUp, TrendingDown, Search, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
 
