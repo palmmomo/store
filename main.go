@@ -1,0 +1,117 @@
+package main
+
+import (
+	"log"
+	"os"
+
+	"restaurant-backend/backend/db"
+	"restaurant-backend/backend/handlers"
+	"restaurant-backend/backend/middleware"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
+)
+
+func main() {
+	// Load .env file
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using environment variables")
+	}
+
+	// Init Supabase client
+	db.Init()
+
+	// Setup Gin
+	r := gin.Default()
+
+	// CORS configuration
+	frontendURL := os.Getenv("FRONTEND_URL")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:5173"
+	}
+
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{frontendURL},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowCredentials: true,
+	}))
+
+	// Public routes
+	public := r.Group("/api")
+	{
+		public.POST("/auth/login", handlers.Login)
+		public.POST("/auth/refresh", handlers.RefreshToken)
+	}
+
+	// Protected routes (require JWT)
+	api := r.Group("/api")
+	api.Use(middleware.AuthMiddleware())
+	{
+		// Branch routes
+		branches := api.Group("/branches")
+		{
+			branches.GET("", handlers.GetBranches)
+			branches.POST("", middleware.RequireRole("superadmin"), handlers.CreateBranch)
+			branches.PUT("/:id", middleware.RequireRole("superadmin"), handlers.UpdateBranch)
+			branches.DELETE("/:id", middleware.RequireRole("superadmin"), handlers.DeleteBranch)
+		}
+
+		// Product routes
+		products := api.Group("/products")
+		{
+			products.GET("", handlers.GetProducts)
+			products.GET("/:id", handlers.GetProduct)
+			products.POST("", middleware.RequireRole("superadmin", "branch_admin"), handlers.CreateProduct)
+			products.PUT("/:id", middleware.RequireRole("superadmin", "branch_admin"), handlers.UpdateProduct)
+			products.DELETE("/:id", middleware.RequireRole("superadmin", "branch_admin"), handlers.DeleteProduct)
+		}
+
+		// Stock routes
+		stock := api.Group("/stock")
+		{
+			stock.GET("", handlers.GetStock)
+			stock.POST("", middleware.RequireRole("superadmin", "branch_admin"), handlers.CreateStockEntry)
+			stock.PUT("/:id", handlers.UpdateStock)
+			stock.GET("/logs", middleware.RequireRole("superadmin", "branch_admin"), handlers.GetStockLogs)
+		}
+
+		// Order/POS routes
+		orders := api.Group("/orders")
+		{
+			orders.GET("", middleware.RequireRole("superadmin", "branch_admin"), handlers.GetOrders)
+			orders.GET("/:id", handlers.GetOrder)
+			orders.POST("", handlers.CreateOrder)
+		}
+
+		// Stats routes
+		stats := api.Group("/stats")
+		{
+			stats.GET("/dashboard", middleware.RequireRole("superadmin", "branch_admin"), handlers.GetDashboard)
+			stats.GET("/chart", middleware.RequireRole("superadmin", "branch_admin"), handlers.GetSalesChart)
+			stats.GET("/summary", middleware.RequireRole("superadmin", "branch_admin"), handlers.GetSummary)
+		}
+
+		// Admin routes (superadmin only)
+		admin := api.Group("/admin")
+		admin.Use(middleware.RequireRole("superadmin"))
+		{
+			admin.GET("/users", handlers.GetUsers)
+			admin.POST("/users", handlers.InviteUser)
+			admin.PUT("/users/:id/role", handlers.UpdateUserRole)
+			admin.DELETE("/users/:id", handlers.DeleteUser)
+			admin.GET("/logs", handlers.GetActivityLogs)
+		}
+	}
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Printf("Server starting on :%s", port)
+	if err := r.Run(":" + port); err != nil {
+		log.Fatal("Failed to start server:", err)
+	}
+}
