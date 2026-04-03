@@ -4,9 +4,12 @@ import (
 	"log"
 	"os"
 
-	"restaurant-backend/backend/db"
-	"restaurant-backend/backend/handlers"
-	"restaurant-backend/backend/middleware"
+	"store-backend/backend/db"
+	"store-backend/backend/handlers"
+	"store-backend/backend/middleware"
+
+	"store-backend/backend/repository"
+	"store-backend/backend/service"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -18,9 +21,13 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, using environment variables")
 	}
-
+	log.Println("SUPABASE_URL:", os.Getenv("SUPABASE_URL"))
 	// Init Supabase client
 	db.Init()
+
+	stockRepo := repository.NewStockRepository()
+	stockService := service.NewStockService(stockRepo)
+	stockHandler := handlers.NewStockHandler(stockService)
 
 	// Setup Gin
 	r := gin.Default()
@@ -71,10 +78,16 @@ func main() {
 		// Stock routes
 		stock := api.Group("/stock")
 		{
-			stock.GET("", handlers.GetStock)
-			stock.POST("", middleware.RequireRole("superadmin", "branch_admin"), handlers.CreateStockEntry)
-			stock.PUT("/:id", handlers.UpdateStock)
-			stock.GET("/logs", middleware.RequireRole("superadmin", "branch_admin"), handlers.GetStockLogs)
+			// Master Data
+			stock.POST("/items", middleware.RequireRole("superadmin", "branch_admin"), stockHandler.CreateStockItem)
+			stock.GET("", stockHandler.GetStock)
+			stock.GET("/items/:id", stockHandler.GetStockByID)
+			stock.PUT("/items/:id", middleware.RequireRole("superadmin", "branch_admin"), stockHandler.UpdateStockItem)
+			stock.DELETE("/items/:id", middleware.RequireRole("superadmin", "branch_admin"), stockHandler.DeleteStockItem)
+
+			// Transactions
+			stock.POST("/purchase", middleware.RequireRole("superadmin", "branch_admin"), stockHandler.PurchaseStock)
+			stock.POST("/deduct", stockHandler.DeductStock)
 		}
 
 		// Order/POS routes
