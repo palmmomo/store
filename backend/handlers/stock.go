@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"restaurant-backend/backend/db"
-	"restaurant-backend/backend/middleware"
+	"store-backend/backend/db"
+	"store-backend/backend/middleware"
 
 	"github.com/gin-gonic/gin"
 )

@@ -1,4 +1,4 @@
-module restaurant-backend
+module store-backend
 
 go 1.26.1
 

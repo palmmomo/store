@@ -20,9 +20,10 @@ type supabaseAuthResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	User         struct {
-		ID          string                 `json:"id"`
-		Email       string                 `json:"email"`
-		AppMetadata map[string]interface{} `json:"app_metadata"`
+		ID           string                 `json:"id"`
+		Email        string                 `json:"email"`
+		AppMetadata  map[string]interface{} `json:"app_metadata"`
+		UserMetadata map[string]interface{} `json:"user_metadata"`
 	} `json:"user"`
 	Error            string `json:"error"`
 	ErrorDescription string `json:"error_description"`

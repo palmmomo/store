@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"restaurant-backend/backend/db"
-	"restaurant-backend/backend/middleware"
+	"store-backend/backend/db"
+	"store-backend/backend/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -74,12 +74,12 @@ func GetDashboard(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"total_revenue":  totalRevenue,
-		"total_orders":   len(allOrders),
-		"total_products": len(products),
+		"total_revenue":   totalRevenue,
+		"total_orders":    len(allOrders),
+		"total_products":  len(products),
 		"low_stock_count": lowStockCount,
-		"revenue_today":  revenueToday,
-		"orders_today":   ordersToday,
+		"revenue_today":   revenueToday,
+		"orders_today":    ordersToday,
 	})
 }
 
