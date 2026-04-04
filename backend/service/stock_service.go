@@ -2,26 +2,29 @@ package service
 
 import (
 	"errors"
-	"time"
-
+	"fmt"
 	"store-backend/backend/models"
 	"store-backend/backend/repository"
+	"time"
 )
 
+// StockService interface
 type StockService interface {
-	CreateMaterial(req CreateMaterialDTO) (*models.Material, error)
-	GetAllStock() ([]models.Material, error)
-	GetStockByID(id uint) (*models.Material, error)
-	UpdateMaterial(id uint, req UpdateMaterialDTO) (*models.Material, error)
-	DeleteMaterial(id uint) error
-	PurchaseMaterial(req PurchaseRequestDTO) error
-	DeductMaterial(req UsageRequestDTO) error
+	CreateMaterial(branchID string, req CreateMaterialDTO) (*models.Material, error)
+	GetAllStock(branchID string) ([]models.Material, error)
+	GetStockByID(id uint, branchID string) (*models.Material, error)
+	UpdateMaterial(id uint, branchID string, req UpdateMaterialDTO) (*models.Material, error)
+	DeleteMaterial(id uint, branchID string) error
+	PurchaseMaterial(branchID string, req PurchaseRequestDTO) error
+	DeductMaterial(branchID string, req UsageRequestDTO) error
+	GetPriceComparison(materialID uint) ([]models.SupplierComparison, error)
 }
 
 type stockService struct {
 	repo repository.StockRepository
 }
 
+// NewStockService constructor
 func NewStockService(repo repository.StockRepository) StockService {
 	return &stockService{repo: repo}
 }
@@ -30,7 +33,7 @@ type CreateMaterialDTO struct {
 	Name          string  `json:"name" binding:"required"`
 	CategoryID    uint    `json:"category_id" binding:"required"`
 	Unit          string  `json:"unit" binding:"required"`
-	MinStockLevel float64 `json:"min_stock_level" binding:"min=0"`
+	MinStockLevel float64 `json:"min_stock_level"`
 }
 
 type UpdateMaterialDTO struct {
@@ -55,8 +58,10 @@ type UsageRequestDTO struct {
 	Notes      string  `json:"notes"`
 }
 
-func (s *stockService) CreateMaterial(req CreateMaterialDTO) (*models.Material, error) {
+// CreateMaterial สร้างวัสดุใหม่ในสต๊อก
+func (s *stockService) CreateMaterial(branchID string, req CreateMaterialDTO) (*models.Material, error) {
 	material := &models.Material{
+		BranchID:      branchID,
 		Name:          req.Name,
 		CategoryID:    req.CategoryID,
 		Unit:          req.Unit,
@@ -69,16 +74,19 @@ func (s *stockService) CreateMaterial(req CreateMaterialDTO) (*models.Material, 
 	return material, err
 }
 
-func (s *stockService) GetAllStock() ([]models.Material, error) {
-	return s.repo.FindAllMaterials()
+// GetAllStock
+func (s *stockService) GetAllStock(branchID string) ([]models.Material, error) {
+	return s.repo.FindAllMaterials(branchID)
 }
 
-func (s *stockService) GetStockByID(id uint) (*models.Material, error) {
-	return s.repo.FindMaterialByID(id)
+// GetStockByID
+func (s *stockService) GetStockByID(id uint, branchID string) (*models.Material, error) {
+	return s.repo.FindMaterialByID(id, branchID)
 }
 
-func (s *stockService) UpdateMaterial(id uint, req UpdateMaterialDTO) (*models.Material, error) {
-	material, err := s.repo.FindMaterialByID(id)
+// UpdateMaterial
+func (s *stockService) UpdateMaterial(id uint, branchID string, req UpdateMaterialDTO) (*models.Material, error) {
+	material, err := s.repo.FindMaterialByID(id, branchID)
 	if err != nil {
 		return nil, errors.New("ไม่พบวัสดุที่ต้องการแก้ไข")
 	}
@@ -101,13 +109,30 @@ func (s *stockService) UpdateMaterial(id uint, req UpdateMaterialDTO) (*models.M
 	return material, err
 }
 
-func (s *stockService) DeleteMaterial(id uint) error {
-	return s.repo.DeleteMaterial(id)
+// DeleteMaterial
+func (s *stockService) DeleteMaterial(id uint, branchID string) error {
+	return s.repo.DeleteMaterial(id, branchID)
 }
 
-func (s *stockService) PurchaseMaterial(req PurchaseRequestDTO) error {
+// PurchaseMaterial
+func (s *stockService) PurchaseMaterial(branchID string, req PurchaseRequestDTO) error {
+	// 1. ตรวจสอบว่าวัสดุมีอยู่จริงในสาขานี้ไหม
+	material, err := s.repo.FindMaterialByID(req.MaterialID, branchID)
+	if err != nil {
+		return errors.New("ไม่พบข้อมูลวัสดุในสาขานี้")
+	}
+
+	// 2. อัปเดตยอดสต๊อกปัจจุบัน
+	material.CurrentStock += req.Quantity
+	material.UpdatedAt = time.Now()
+	if err := s.repo.UpdateMaterial(material); err != nil {
+		return fmt.Errorf("ไม่สามารถอัปเดตยอดสต๊อกได้: %v", err)
+	}
+
+	// 3. บันทึก Transaction การซื้อ (เพื่อเอาไว้เปรียบเทียบราคา)
 	unitCost := req.TotalPrice / req.Quantity
-	purchaseRecord := models.PurchaseTransaction{
+	purchaseRecord := &models.PurchaseTransaction{
+		BranchID:     branchID,
 		MaterialID:   req.MaterialID,
 		SupplierID:   req.SupplierID,
 		Quantity:     req.Quantity,
@@ -116,16 +141,90 @@ func (s *stockService) PurchaseMaterial(req PurchaseRequestDTO) error {
 		PurchaseDate: time.Now(),
 		ReceiptNo:    req.ReceiptNo,
 	}
-	return s.repo.RecordPurchaseTx(&purchaseRecord)
+
+	return s.repo.InsertPurchase(purchaseRecord)
 }
 
-func (s *stockService) DeductMaterial(req UsageRequestDTO) error {
-	usageRecord := models.UsageTransaction{
+// DeductMaterial ระบบเบิกใช้: เช็คสต๊อกพอมั้ย -> หักยอด -> บันทึกประวัติการใช้
+func (s *stockService) DeductMaterial(branchID string, req UsageRequestDTO) error {
+	// 1. ดึงยอดปัจจุบันมาเช็ค
+	material, err := s.repo.FindMaterialByID(req.MaterialID, branchID)
+	if err != nil {
+		return errors.New("ไม่พบข้อมูลวัสดุ")
+	}
+
+	// 2. ตรวจสอบสต๊อกคงเหลือ (Business Logic)
+	if material.CurrentStock < req.Quantity {
+		return fmt.Errorf("สต๊อกไม่พอ (คงเหลือ: %.2f, ต้องการใช้: %.2f)", material.CurrentStock, req.Quantity)
+	}
+
+	// 3. หักสต๊อก
+	material.CurrentStock -= req.Quantity
+	material.UpdatedAt = time.Now()
+	if err := s.repo.UpdateMaterial(material); err != nil {
+		return fmt.Errorf("ไม่สามารถหักยอดสต๊อกได้: %v", err)
+	}
+
+	// 4. บันทึกประวัติการใช้งาน
+	usageRecord := &models.UsageTransaction{
+		BranchID:     branchID,
 		MaterialID:   req.MaterialID,
 		JobID:        req.JobID,
 		QuantityUsed: req.Quantity,
 		UsageDate:    time.Now(),
 		Notes:        req.Notes,
 	}
-	return s.repo.RecordUsageTx(&usageRecord)
+
+	return s.repo.InsertUsage(usageRecord)
+}
+
+// GetPriceComparison ดึงประวัติการซื้อทั้งหมดของวัสดุชิ้นนี้มาเปรียบเทียบราคา (ราคาล่าสุดและราคาที่ถูกที่สุดของแต่ละร้าน)
+func (s *stockService) GetPriceComparison(materialID uint) ([]models.SupplierComparison, error) {
+	// 1. ดึงประวัติการซื้อทั้งหมดของวัสดุชิ้นนี้ (Repository ต้องทำ Join Supplier มาให้)
+	rawPurchases, err := s.repo.GetPurchasesByMaterial(materialID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. ใช้ Map ใน Go เพื่อหาค่า Min และ Last ของแต่ละ Supplier
+	comparisonMap := make(map[string]models.SupplierComparison)
+
+	for _, p := range rawPurchases {
+		// ดึงข้อมูลชื่อ Supplier จาก Map (Supabase Join Result)
+		sName := "ไม่ระบุชื่อร้าน"
+		if supplier, ok := p["suppliers"].(map[string]interface{}); ok {
+			sName = supplier["name"].(string)
+		}
+
+		unitCost := p["unit_cost"].(float64)
+		purchaseDate, _ := time.Parse(time.RFC3339, p["purchase_date"].(string))
+
+		if item, exists := comparisonMap[sName]; !exists {
+			comparisonMap[sName] = models.SupplierComparison{
+				SupplierName: sName,
+				MinPrice:     unitCost,
+				LastPrice:    unitCost,
+				LastPurchase: purchaseDate,
+			}
+		} else {
+			// หาค่าที่ถูกที่สุด
+			if unitCost < item.MinPrice {
+				item.MinPrice = unitCost
+			}
+			// หาค่าล่าสุด
+			if purchaseDate.After(item.LastPurchase) {
+				item.LastPrice = unitCost
+				item.LastPurchase = purchaseDate
+			}
+			comparisonMap[sName] = item
+		}
+	}
+
+	// 3. แปลง Map กลับเป็น Slice เพื่อส่งออกไปยังหน้าบ้าน
+	var results []models.SupplierComparison
+	for _, v := range comparisonMap {
+		results = append(results, v)
+	}
+
+	return results, nil
 }

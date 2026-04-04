@@ -16,6 +16,7 @@ type Supplier struct {
 
 type Material struct {
 	ID            uint      `json:"id"`
+	BranchID      string    `json:"branch_id"`
 	Name          string    `json:"name"`
 	CategoryID    uint      `json:"category_id"`
 	Unit          string    `json:"unit"`
@@ -27,6 +28,7 @@ type Material struct {
 
 type PurchaseTransaction struct {
 	ID           uint      `json:"id"`
+	BranchID     string    `json:"branch_id"`
 	MaterialID   uint      `json:"material_id"`
 	SupplierID   uint      `json:"supplier_id"`
 	Quantity     float64   `json:"quantity"`
@@ -38,9 +40,17 @@ type PurchaseTransaction struct {
 
 type UsageTransaction struct {
 	ID           uint      `json:"id"`
+	BranchID     string    `json:"branch_id"`
 	MaterialID   uint      `json:"material_id"`
 	JobID        *uint     `json:"job_id"`
 	QuantityUsed float64   `json:"quantity_used"`
 	UsageDate    time.Time `json:"usage_date"`
 	Notes        string    `json:"notes"`
+}
+
+type SupplierComparison struct {
+	SupplierName string    `json:"supplier_name"`
+	LastPrice    float64   `json:"last_price"`
+	MinPrice     float64   `json:"min_price"`
+	LastPurchase time.Time `json:"last_purchase"`
 }
