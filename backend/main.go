@@ -88,6 +88,7 @@ func main() {
 			// Transactions
 			stock.POST("/purchase", middleware.RequireRole("superadmin", "branch_admin"), stockHandler.PurchaseStock)
 			stock.POST("/deduct", stockHandler.DeductStock)
+			stock.GET("/compare/:material_id", stockHandler.GetComparison)
 		}
 
 		// Order/POS routes

@@ -62,14 +62,14 @@ type StockLog struct {
 
 // Order represents a POS order
 type Order struct {
-	ID         string      `json:"id"`
-	BranchID   string      `json:"branch_id"`
-	UserID     string      `json:"user_id"`
-	Total      float64     `json:"total"`
-	Status     string      `json:"status"` // pending, completed, cancelled
-	Note       string      `json:"note"`
-	Items      []OrderItem `json:"items,omitempty"`
-	CreatedAt  time.Time   `json:"created_at"`
+	ID        string      `json:"id"`
+	BranchID  string      `json:"branch_id"`
+	UserID    string      `json:"user_id"`
+	Total     float64     `json:"total"`
+	Status    string      `json:"status"` // pending, completed, cancelled
+	Note      string      `json:"note"`
+	Items     []OrderItem `json:"items,omitempty"`
+	CreatedAt time.Time   `json:"created_at"`
 }
 
 // OrderItem represents a line item in an order
@@ -115,9 +115,9 @@ type UpdateStockRequest struct {
 }
 
 type CreateOrderRequest struct {
-	BranchID string              `json:"branch_id" binding:"required"`
-	Note     string              `json:"note"`
-	Items    []OrderItemRequest  `json:"items" binding:"required,min=1"`
+	BranchID string             `json:"branch_id" binding:"required"`
+	Note     string             `json:"note"`
+	Items    []OrderItemRequest `json:"items" binding:"required,min=1"`
 }
 
 type OrderItemRequest struct {
@@ -126,12 +126,12 @@ type OrderItemRequest struct {
 }
 
 type DashboardStats struct {
-	TotalRevenue     float64 `json:"total_revenue"`
-	TotalOrders      int     `json:"total_orders"`
-	TotalProducts    int     `json:"total_products"`
-	LowStockCount    int     `json:"low_stock_count"`
-	RevenueToday     float64 `json:"revenue_today"`
-	OrdersToday      int     `json:"orders_today"`
+	TotalRevenue  float64 `json:"total_revenue"`
+	TotalOrders   int     `json:"total_orders"`
+	TotalProducts int     `json:"total_products"`
+	LowStockCount int     `json:"low_stock_count"`
+	RevenueToday  float64 `json:"revenue_today"`
+	OrdersToday   int     `json:"orders_today"`
 }
 
 type SalesChartData struct {

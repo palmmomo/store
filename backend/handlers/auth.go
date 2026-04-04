@@ -27,6 +27,7 @@ type supabaseAuthResponse struct {
 	} `json:"user"`
 	Error            string `json:"error"`
 	ErrorDescription string `json:"error_description"`
+	Message          string `json:"msg"` // ดักไว้สำหรับบางเคสที่ Supabase ส่ง msg มาแทน
 }
 
 // Login authenticates user via Supabase Auth
@@ -41,15 +42,19 @@ func Login(c *gin.Context) {
 	supabaseAnonKey := os.Getenv("SUPABASE_ANON_KEY")
 
 	payload, _ := json.Marshal(req)
-	httpReq, err := http.NewRequest("POST",
-		fmt.Sprintf("%s/auth/v1/token?grant_type=password", supabaseURL),
-		bytes.NewBuffer(payload))
+	// URL สำหรับยิงไปที่ GoTrue (Auth service) ของ Supabase
+	url := fmt.Sprintf("%s/auth/v1/token?grant_type=password", supabaseURL)
+
+	httpReq, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create request"})
 		return
 	}
+
+	// บรรทัดที่ต้องมีเพื่อให้ Supabase อนุญาตให้เข้าถึง API
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("apikey", supabaseAnonKey)
+	httpReq.Header.Set("Authorization", "Bearer "+supabaseAnonKey)
 
 	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
@@ -65,12 +70,19 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	if authResp.Error != "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": authResp.ErrorDescription})
+	// เช็คว่า Supabase ตอบกลับมาสำเร็จ (200) หรือไม่
+	if resp.StatusCode != http.StatusOK {
+		msg := "invalid login credentials"
+		if authResp.ErrorDescription != "" {
+			msg = authResp.ErrorDescription
+		} else if authResp.Message != "" {
+			msg = authResp.Message
+		}
+		c.JSON(resp.StatusCode, gin.H{"error": msg})
 		return
 	}
 
-	// Extract role and branch from app_metadata
+	// Extract role and branch from app_metadata (ข้อมูลที่เรา Update ใน SQL Editor)
 	role := "staff"
 	branchID := ""
 	if authResp.User.AppMetadata != nil {
@@ -108,15 +120,17 @@ func RefreshToken(c *gin.Context) {
 	supabaseAnonKey := os.Getenv("SUPABASE_ANON_KEY")
 
 	payload, _ := json.Marshal(map[string]string{"refresh_token": body.RefreshToken})
-	httpReq, err := http.NewRequest("POST",
-		fmt.Sprintf("%s/auth/v1/token?grant_type=refresh_token", supabaseURL),
-		bytes.NewBuffer(payload))
+	url := fmt.Sprintf("%s/auth/v1/token?grant_type=refresh_token", supabaseURL)
+
+	httpReq, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create request"})
 		return
 	}
+
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("apikey", supabaseAnonKey)
+	httpReq.Header.Set("Authorization", "Bearer "+supabaseAnonKey)
 
 	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
@@ -131,8 +145,8 @@ func RefreshToken(c *gin.Context) {
 		return
 	}
 
-	if authResp.Error != "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": authResp.ErrorDescription})
+	if resp.StatusCode != http.StatusOK {
+		c.JSON(resp.StatusCode, gin.H{"error": authResp.ErrorDescription})
 		return
 	}
 
