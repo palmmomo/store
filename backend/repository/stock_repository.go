@@ -2,8 +2,8 @@ package repository
 
 import (
 	"fmt"
-	"store-backend/backend/db"
-	"store-backend/backend/models"
+	"store-backend/db"
+	"store-backend/models"
 )
 
 type StockRepository interface {

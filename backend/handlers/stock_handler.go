@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"net/http"
-	"store-backend/backend/middleware"
-	"store-backend/backend/service"
+	"store-backend/middleware"
+	"store-backend/service"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
