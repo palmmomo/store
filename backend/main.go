@@ -17,11 +17,20 @@ import (
 )
 
 func main() {
-	// Load .env file
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, using environment variables")
+	// Load .env file robustly
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("WARNING: Could not load .env file:", err)
+		// Try to fallback to ../frontend/.env or ./.env.local if they exist
+		_ = godotenv.Load("../frontend/.env")
 	}
-	log.Println("SUPABASE_URL:", os.Getenv("SUPABASE_URL"))
+	
+	log.Println("=== STARTUP CHECKS ===")
+	log.Printf("SUPABASE_URL: '%s'\n", os.Getenv("SUPABASE_URL"))
+	if os.Getenv("SUPABASE_URL") == "" {
+		log.Println("👉 ERROR: SUPABASE_URL is EMPTY! The backend will not work properly.")
+	}
+	log.Println("======================")
 	// Init Supabase client
 	db.Init()
 
@@ -45,11 +54,11 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	// Public routes
 	public := r.Group("/api")
 	{
 		public.POST("/auth/login", handlers.Login)
 		public.POST("/auth/refresh", handlers.RefreshToken)
+		public.POST("/auth/setup", handlers.SetupFirstAdmin)
 	}
 
 	// Protected routes (require JWT)
@@ -79,14 +88,14 @@ func main() {
 		stock := api.Group("/stock")
 		{
 			// Master Data
-			stock.POST("/items", middleware.RequireRole("superadmin", "branch_admin"), stockHandler.CreateStockItem)
+			stock.POST("/items", middleware.RequireRole("superadmin", "branch_admin", "staff"), stockHandler.CreateStockItem)
 			stock.GET("", stockHandler.GetStock)
 			stock.GET("/items/:id", stockHandler.GetStockByID)
-			stock.PUT("/items/:id", middleware.RequireRole("superadmin", "branch_admin"), stockHandler.UpdateStockItem)
-			stock.DELETE("/items/:id", middleware.RequireRole("superadmin", "branch_admin"), stockHandler.DeleteStockItem)
+			stock.PUT("/items/:id", middleware.RequireRole("superadmin", "branch_admin", "staff"), stockHandler.UpdateStockItem)
+			stock.DELETE("/items/:id", middleware.RequireRole("superadmin", "branch_admin", "staff"), stockHandler.DeleteStockItem)
 
 			// Transactions
-			stock.POST("/purchase", middleware.RequireRole("superadmin", "branch_admin"), stockHandler.PurchaseStock)
+			stock.POST("/purchase", middleware.RequireRole("superadmin", "branch_admin", "staff"), stockHandler.PurchaseStock)
 			stock.POST("/deduct", stockHandler.DeductStock)
 			stock.GET("/compare/:material_id", stockHandler.GetComparison)
 		}
@@ -112,7 +121,7 @@ func main() {
 		admin.Use(middleware.RequireRole("superadmin"))
 		{
 			admin.GET("/users", handlers.GetUsers)
-			admin.POST("/users", handlers.InviteUser)
+			admin.POST("/users", handlers.CreateUser)
 			admin.PUT("/users/:id/role", handlers.UpdateUserRole)
 			admin.DELETE("/users/:id", handlers.DeleteUser)
 			admin.GET("/logs", handlers.GetActivityLogs)

@@ -12,7 +12,7 @@ export default function OrdersPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
 
   useEffect(() => {
-    orderApi.getAll().then((r) => { setOrders(r.data); setLoading(false) })
+    orderApi.getAll().then((r: any) => { setOrders(r.data); setLoading(false) }).catch(() => setLoading(false))
   }, [])
 
   if (loading) return <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}><div className="spinner" /></div>
