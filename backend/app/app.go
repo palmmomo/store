@@ -55,12 +55,19 @@ func InitApp() {
 	if frontendURL == "" {
 		frontendURL = "http://localhost:5173"
 	}
+	
+	// Strip trailing slash if present to avoid CORS header mismatch
+	if len(frontendURL) > 0 && frontendURL[len(frontendURL)-1] == '/' {
+		frontendURL = frontendURL[:len(frontendURL)-1]
+	}
 
 	Engine.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{frontendURL, "https://store-psi-bice.vercel.app"},
+		AllowOrigins:     []string{frontendURL, "https://store-psi-bice.vercel.app", "http://localhost:5173"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With", "apikey"},
+		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
+		AllowWildcard:    true,
 	}))
 
 	public := Engine.Group("/api")
