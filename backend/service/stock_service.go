@@ -3,8 +3,8 @@ package service
 import (
 	"errors"
 	"fmt"
-	"store-backend/backend/models"
-	"store-backend/backend/repository"
+	"store-backend/models"
+	"store-backend/repository"
 	"time"
 )
 

@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"os"
 
-	"store-backend/backend/db"
-	"store-backend/backend/handlers"
-	"store-backend/backend/middleware"
+	"store-backend/db"
+	"store-backend/handlers"
+	"store-backend/middleware"
 
-	"store-backend/backend/repository"
-	"store-backend/backend/service"
+	"store-backend/repository"
+	"store-backend/service"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"

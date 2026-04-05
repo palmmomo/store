@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"os"
 
-	"store-backend/backend/db"
+	"store-backend/db"
 
 	"github.com/gin-gonic/gin"
 )

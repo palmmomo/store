@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"store-backend/backend/db"
-	"store-backend/backend/middleware"
+	"store-backend/db"
+	"store-backend/middleware"
 
 	"github.com/gin-gonic/gin"
 )
