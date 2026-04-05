@@ -1,91 +1,111 @@
-import { useEffect, useState } from 'react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { statsApi } from '../api/client'
-import type { SalesChartData } from '../types'
+import { useState, useEffect } from 'react'
+import { statsApi, branchApi } from '../api/client'
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar
+} from 'recharts'
 
-const formatCurrency = (v: number) =>
-  new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(v)
+interface ChartData {
+  date: string
+  revenue: number
+  orders: number
+}
+
+interface Branch {
+  id: string
+  name: string
+}
 
 export default function StatsPage() {
-  const [chart, setChart] = useState<SalesChartData[]>([])
+  const [data, setData] = useState<ChartData[]>([])
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [selectedBranch, setSelectedBranch] = useState<string>('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    statsApi.getChart().then((r) => { setChart(r.data); setLoading(false) })
-  }, [])
+    const load = async () => {
+      setLoading(true)
+      try {
+        const [chartRes, branchRes] = await Promise.all([
+          statsApi.getChart(selectedBranch),
+          branchApi.getAll()
+        ])
+        setData(Array.isArray(chartRes.data) ? chartRes.data : [])
+        setBranches(Array.isArray(branchRes.data) ? branchRes.data : [])
+      } catch (err) {
+        console.error('Failed to load chart data', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [selectedBranch])
 
-  const chartData = chart.map((d) => ({
-    ...d,
-    dateLabel: new Date(d.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }),
-  }))
-
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}><div className="spinner" /></div>
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div style={{ background: '#fff', border: '1px solid #eee', padding: 10, borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+          <p style={{ margin: '0 0 8px', fontWeight: 600 }}>{label}</p>
+          {payload.map((p: any, i: number) => (
+            <div key={i} style={{ color: p.color, fontSize: 13, marginBottom: 4 }}>
+              {p.name}: {p.name === 'รายรับ' ? p.value.toLocaleString('th-TH') + ' บาท' : p.value}
+            </div>
+          ))}
+        </div>
+      )
+    }
+    return null
+  }
 
   return (
     <div>
       <div className="page-header">
-        <div>
-          <h1 className="page-title">สถิติยอดขาย</h1>
-          <p className="page-subtitle">ข้อมูลยอดขาย 30 วันล่าสุด</p>
-        </div>
+        <div><h1 className="page-title">สถิติรวม 30 วัน</h1><p className="page-subtitle">แสดงข้อมูลรายรับและจำนวนงาน</p></div>
+        <select className="form-input" style={{ width: 200 }} value={selectedBranch} onChange={e => setSelectedBranch(e.target.value)}>
+          <option value="">-- ทุกสาขา --</option>
+          {branches.map(b => (
+            <option key={b.id} value={b.id}>{b.name}</option>
+          ))}
+        </select>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div className="card">
-          <div className="card-header"><span className="card-title">รายได้รายวัน (บาท)</span></div>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="dateLabel" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false}
-                tickFormatter={(v) => `${(v/1000).toFixed(0)}k`} />
-              <Tooltip
-                contentStyle={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }}
-                formatter={(v: any) => [formatCurrency(v as number), 'รายได้']}
-              />
-              <Bar dataKey="revenue" fill="#6366f1" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+      {loading ? (
+        <p style={{ color: 'var(--text-muted)' }}>กำลังโหลดกราฟ...</p>
+      ) : (
+        <div style={{ display: 'grid', gap: 24 }}>
+          
+          <div className="card">
+            <h3 style={{ marginBottom: 24, fontSize: 16 }}>แนวโน้มรายรับประจำวัน</h3>
+            <div style={{ height: 320 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} dx={-10} tickFormatter={v => '฿' + (v >= 1000 ? (v/1000) + 'k' : v)} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Line type="monotone" dataKey="revenue" name="รายรับ" stroke="var(--primary)" strokeWidth={3} dot={{ r: 4, fill: '#fff', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
 
-        <div className="card">
-          <div className="card-header"><span className="card-title">จำนวนออเดอร์รายวัน</span></div>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="dateLabel" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} />
-              <Tooltip
-                contentStyle={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }}
-                formatter={(v: any) => [v, 'ออเดอร์']}
-              />
-              <Bar dataKey="orders" fill="#10b981" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+          <div className="card">
+            <h3 style={{ marginBottom: 24, fontSize: 16 }}>จำนวนงานรายวัน</h3>
+            <div style={{ height: 300 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748B' }} dx={-10} />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--bg-secondary)' }} />
+                  <Bar dataKey="orders" name="จำนวนงาน" fill="var(--info)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
 
-        <div className="card">
-          <div className="card-header"><span className="card-title">สรุปตัวเลข (30 วัน)</span></div>
-          <table style={{ width: '100%' }}>
-            <thead>
-              <tr>
-                <th>วันที่</th>
-                <th style={{ textAlign: 'right' }}>ออเดอร์</th>
-                <th style={{ textAlign: 'right' }}>รายได้</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...chartData].reverse().map((d, i) => (
-                <tr key={i}>
-                  <td>{d.dateLabel}</td>
-                  <td style={{ textAlign: 'right' }}>{d.orders}</td>
-                  <td style={{ textAlign: 'right', color: 'var(--success)', fontWeight: 500 }}>{formatCurrency(d.revenue)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
-      </div>
+      )}
     </div>
   )
 }

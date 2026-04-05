@@ -462,3 +462,79 @@ textarea.form-input { resize: vertical; min-height: 80px; }
   .stats-grid { grid-template-columns: 1fr 1fr; }
   .transaction-form { grid-template-columns: 1fr; }
 }
+
+/* Badge extras */
+.badge-primary { background: var(--primary-bg); color: var(--primary); }
+.badge-neutral { background: var(--bg-elevated); color: var(--text-secondary); }
+
+/* Icon Buttons */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  padding: 0;
+  font-size: 0;
+}
+.btn-icon:hover { background: var(--bg-elevated); color: var(--primary); border-color: var(--primary-light); }
+.btn-icon.delete:hover { background: var(--danger-bg); color: var(--danger); border-color: var(--danger); }
+
+/* Quick-add bar */
+.quick-add-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--primary-light);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.06);
+  transition: box-shadow 0.2s;
+}
+.quick-add-bar:focus-within {
+  box-shadow: 0 0 0 4px rgba(99,102,241,0.12);
+}
+.quick-add-icon {
+  margin-top: 10px;
+  flex-shrink: 0;
+}
+.quick-add-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--text-primary);
+  font-family: inherit;
+  outline: none;
+  padding: 6px 0;
+  font-weight: 500;
+}
+.quick-add-input::placeholder { color: var(--text-muted); font-weight: 400; }
+
+/* Quick preview chips */
+.quick-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 2px;
+  flex-wrap: wrap;
+  animation: fadeIn 0.15s ease;
+}
+
+/* Branch card hover */
+.branch-card {
+  transition: box-shadow 0.2s, transform 0.2s;
+  cursor: default;
+}
+.branch-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}

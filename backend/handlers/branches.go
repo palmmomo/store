@@ -115,14 +115,13 @@ func UpdateBranch(c *gin.Context) {
 	c.JSON(http.StatusOK, result[0])
 }
 
-// DeleteBranch soft-deletes a branch (superadmin only)
+// DeleteBranch hard-deletes a branch and its related data (superadmin only)
 func DeleteBranch(c *gin.Context) {
 	id := c.Param("id")
-	data := map[string]interface{}{"is_active": false}
 
-	if err := db.Client.Update("branches", fmt.Sprintf("id=eq.%s", id), data, nil); err != nil {
+	if err := db.Client.Delete("branches", fmt.Sprintf("id=eq.%s", id)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "branch deactivated"})
+	c.JSON(http.StatusOK, gin.H{"message": "branch deleted"})
 }

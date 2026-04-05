@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 
@@ -71,6 +72,9 @@ func Login(c *gin.Context) {
 	}
 
 	// เช็คว่า Supabase ตอบกลับมาสำเร็จ (200) หรือไม่
+	log.Printf("== LOGIN RESPONSE: STATUS %d ==", resp.StatusCode)
+	log.Printf("== LOGIN RESPONSE BODY: %s ==", string(bodyBytes))
+
 	if resp.StatusCode != http.StatusOK {
 		msg := "invalid login credentials"
 		if authResp.ErrorDescription != "" {
@@ -78,9 +82,12 @@ func Login(c *gin.Context) {
 		} else if authResp.Message != "" {
 			msg = authResp.Message
 		}
+		log.Printf("== LOGIN ERROR: %s ==", msg)
 		c.JSON(resp.StatusCode, gin.H{"error": msg})
 		return
 	}
+
+	log.Printf("== LOGIN SUCCESS: USER_ID=%s ==", authResp.User.ID)
 
 	// Extract role and branch from app_metadata (ข้อมูลที่เรา Update ใน SQL Editor)
 	role := "staff"
@@ -154,4 +161,48 @@ func RefreshToken(c *gin.Context) {
 		"access_token":  authResp.AccessToken,
 		"refresh_token": authResp.RefreshToken,
 	})
+}
+
+// SetupFirstAdmin is a temporary route to create the very first superadmin user
+func SetupFirstAdmin(c *gin.Context) {
+	supabaseURL := os.Getenv("SUPABASE_URL")
+	serviceKey := os.Getenv("SUPABASE_SERVICE_KEY")
+
+	// 1. Create admin user
+	payload, _ := json.Marshal(map[string]interface{}{
+		"email":         "admin@admin.com",
+		"password":      "admin123456",
+		"email_confirm": true,
+		"app_metadata": map[string]interface{}{
+			"role":      "superadmin",
+			"branch_id": "",
+		},
+		"user_metadata": map[string]interface{}{
+			"full_name": "Super Admin",
+		},
+	})
+
+	httpReq, _ := http.NewRequest("POST",
+		fmt.Sprintf("%s/auth/v1/admin/users", supabaseURL),
+		bytes.NewBuffer(payload))
+	httpReq.Header.Set("Authorization", "Bearer "+serviceKey)
+	httpReq.Header.Set("apikey", serviceKey)
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to contact supabase"})
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		var authResult map[string]interface{}
+		json.Unmarshal(body, &authResult)
+		c.JSON(resp.StatusCode, authResult)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "success! You can now login with admin@admin.com / admin123456"})
 }

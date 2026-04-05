@@ -87,10 +87,13 @@ func UpdateUserRole(c *gin.Context) {
 	c.JSON(resp.StatusCode, result)
 }
 
-// InviteUser invites a new user via Supabase Admin
-func InviteUser(c *gin.Context) {
+// CreateUser creates a new user with email+password via Supabase Admin API
+// then inserts a profile into user_profiles table
+func CreateUser(c *gin.Context) {
 	var req struct {
 		Email    string `json:"email" binding:"required,email"`
+		Password string `json:"password" binding:"required,min=6"`
+		FullName string `json:"full_name"`
 		Role     string `json:"role"`
 		BranchID string `json:"branch_id"`
 	}
@@ -99,14 +102,24 @@ func InviteUser(c *gin.Context) {
 		return
 	}
 
+	if req.Role == "" {
+		req.Role = "staff"
+	}
+
 	supabaseURL := os.Getenv("SUPABASE_URL")
 	serviceKey := os.Getenv("SUPABASE_SERVICE_KEY")
 
+	// 1. Create user in Supabase Auth with password
 	payload, _ := json.Marshal(map[string]interface{}{
-		"email": req.Email,
+		"email":         req.Email,
+		"password":      req.Password,
+		"email_confirm": true, // skip email verification
 		"app_metadata": map[string]interface{}{
 			"role":      req.Role,
 			"branch_id": req.BranchID,
+		},
+		"user_metadata": map[string]interface{}{
+			"full_name": req.FullName,
 		},
 	})
 
@@ -123,15 +136,35 @@ func InviteUser(c *gin.Context) {
 
 	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to invite user"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 		return
 	}
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	var result map[string]interface{}
-	json.Unmarshal(body, &result)
-	c.JSON(resp.StatusCode, result)
+	var authResult map[string]interface{}
+	json.Unmarshal(body, &authResult)
+
+	if resp.StatusCode >= 400 {
+		c.JSON(resp.StatusCode, authResult)
+		return
+	}
+
+	// 2. Insert profile into user_profiles table
+	userID, _ := authResult["id"].(string)
+	if userID != "" {
+		profileData := map[string]interface{}{
+			"id":        userID,
+			"email":     req.Email,
+			"full_name": req.FullName,
+			"role":      req.Role,
+			"branch_id": req.BranchID,
+		}
+		// Ignore error — profile is supplementary
+		_ = db.Client.Insert("user_profiles", profileData, nil)
+	}
+
+	c.JSON(http.StatusCreated, authResult)
 }
 
 // DeleteUser deletes a user from Supabase Auth

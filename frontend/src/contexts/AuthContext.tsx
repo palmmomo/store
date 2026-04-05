@@ -1,74 +1,85 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
-import { authApi } from '../api/client'
-import type { User } from '../types'
 
-// DEV BYPASS — ตั้งใน frontend/.env.local ค่า: VITE_DEV_BYPASS=true
-const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS === 'true'
-const MOCK_USER: User = {
-  id: 'dev-user',
-  email: 'dev@localhost',
-  role: 'superadmin',
-  branch_id: '',
+interface User {
+  id: string
+  email: string
+  role: string
+  branch_id: string
 }
 
 interface AuthContextType {
   user: User | null
-  isLoading: boolean
+  token: string | null
   login: (email: string, password: string) => Promise<void>
   logout: () => void
-  isAuthenticated: boolean
+  isLoading: boolean
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
+export function useAuth() {
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
+  return ctx
+}
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
+  const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  // Restore session from localStorage on mount
   useEffect(() => {
-    if (DEV_BYPASS) {
-      setUser(MOCK_USER)
-      setIsLoading(false)
-      return
-    }
-    // Restore session from localStorage
-    const storedUser = localStorage.getItem('user')
-    const token = localStorage.getItem('access_token')
-    if (storedUser && token) {
+    const savedToken = localStorage.getItem('access_token')
+    const savedUser = localStorage.getItem('user')
+    if (savedToken && savedUser) {
       try {
-        setUser(JSON.parse(storedUser))
+        setToken(savedToken)
+        setUser(JSON.parse(savedUser))
       } catch {
-        logout()
+        localStorage.clear()
       }
     }
     setIsLoading(false)
   }, [])
 
   const login = async (email: string, password: string) => {
-    const { data } = await authApi.login(email, password)
+    const resp = await fetch(`${API_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    const data = await resp.json()
+    if (!resp.ok) {
+      throw new Error(data.error || 'Login failed')
+    }
+    const u: User = {
+      id: data.user.id,
+      email: data.user.email,
+      role: data.user.role,
+      branch_id: data.user.branch_id || '',
+    }
+    setToken(data.access_token)
+    setUser(u)
     localStorage.setItem('access_token', data.access_token)
     localStorage.setItem('refresh_token', data.refresh_token)
-    localStorage.setItem('user', JSON.stringify(data.user))
-    setUser(data.user)
+    localStorage.setItem('user', JSON.stringify(u))
   }
 
   const logout = () => {
+    setToken(null)
+    setUser(null)
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('user')
-    setUser(null)
   }
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, token, login, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   )
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
-  return ctx
 }

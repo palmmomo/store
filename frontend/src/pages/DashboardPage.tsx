@@ -1,25 +1,45 @@
-import { useEffect, useState } from 'react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
-import { TrendingUp, ShoppingCart, Package, AlertTriangle, DollarSign, BarChart2 } from 'lucide-react'
-import { statsApi } from '../api/client'
-import type { DashboardStats, SalesChartData } from '../types'
+import { useState, useEffect } from 'react'
+import { branchApi, statsApi } from '../api/client'
+import { useAuth } from '../contexts/AuthContext'
+import {
+  ArrowUpRight, ArrowDownLeft, DollarSign, Calendar, Receipt, AlertTriangle,
+} from 'lucide-react'
 
-const formatCurrency = (v: number) =>
-  new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(v)
+const fmt = (v: number) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(v)
+
+interface DashboardData {
+  total_revenue: number
+  total_orders: number
+  total_products: number
+  low_stock_count: number
+  revenue_today: number
+  orders_today: number
+}
+
+interface Branch {
+  id: string
+  name: string
+  address: string
+  phone: string
+}
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [chart, setChart] = useState<SalesChartData[]>([])
+  const { user } = useAuth()
+  const [stats, setStats] = useState<DashboardData | null>(null)
+  const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [sRes, cRes] = await Promise.all([statsApi.getDashboard(), statsApi.getChart()])
-        setStats(sRes.data)
-        setChart(cRes.data)
-      } catch (e) {
-        console.error(e)
+        const [statsRes, branchRes] = await Promise.all([
+          statsApi.getDashboard(),
+          branchApi.getAll(),
+        ])
+        setStats(statsRes.data)
+        setBranches(Array.isArray(branchRes.data) ? branchRes.data : [])
+      } catch (err) {
+        console.error('Dashboard load error:', err)
       } finally {
         setLoading(false)
       }
@@ -27,82 +47,66 @@ export default function DashboardPage() {
     load()
   }, [])
 
-  if (loading) return <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}><div className="spinner" /></div>
-
-  const statCards = [
-    { label: 'รายได้ทั้งหมด', value: formatCurrency(stats?.total_revenue || 0), icon: <DollarSign size={22} />, color: 'green' },
-    { label: 'ออเดอร์ทั้งหมด', value: (stats?.total_orders || 0).toLocaleString(), icon: <ShoppingCart size={22} />, color: 'purple' },
-    { label: 'สินค้าทั้งหมด', value: (stats?.total_products || 0).toLocaleString(), icon: <Package size={22} />, color: 'blue' },
-    { label: 'สต็อกต่ำกว่ากำหนด', value: (stats?.low_stock_count || 0).toString(), icon: <AlertTriangle size={22} />, color: 'red' },
-    { label: 'รายได้วันนี้', value: formatCurrency(stats?.revenue_today || 0), icon: <TrendingUp size={22} />, color: 'green' },
-    { label: 'ออเดอร์วันนี้', value: (stats?.orders_today || 0).toString(), icon: <BarChart2 size={22} />, color: 'yellow' },
-  ]
-
-  // Format chart dates to Thai short format
-  const chartData = chart.map((d) => ({
-    ...d,
-    dateLabel: new Date(d.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }),
-  }))
+  if (loading) return <p style={{ color: 'var(--text-muted)', padding: 24 }}>กำลังโหลดข้อมูล...</p>
 
   return (
     <div>
       <div className="page-header">
         <div>
           <h1 className="page-title">Dashboard</h1>
-          <p className="page-subtitle">ภาพรวมธุรกิจวันนี้</p>
+          <p className="page-subtitle">ภาพรวมร้าน — {user?.email}</p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: 13 }}>
+          <Calendar size={14} /> {new Date().toLocaleDateString('th-TH', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </div>
       </div>
 
-      <div className="stats-grid">
-        {statCards.map((s, i) => (
-          <div key={i} className="stat-card">
-            <div className={`stat-icon ${s.color}`}>{s.icon}</div>
-            <div className="stat-content">
-              <div className="stat-label">{s.label}</div>
-              <div className="stat-value">{s.value}</div>
-            </div>
+      {stats && (
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-icon green"><ArrowUpRight size={20} /></div>
+            <div><div className="stat-label">รายรับวันนี้</div><div className="stat-value" style={{ color: 'var(--success)' }}>{fmt(stats.revenue_today)}</div></div>
           </div>
-        ))}
-      </div>
-
-      <div className="card">
-        <div className="card-header">
-          <span className="card-title">ยอดขาย 30 วันล่าสุด</span>
+          <div className="stat-card">
+            <div className="stat-icon red"><ArrowDownLeft size={20} /></div>
+            <div><div className="stat-label">รายรับรวม</div><div className="stat-value">{fmt(stats.total_revenue)}</div></div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon blue"><DollarSign size={20} /></div>
+            <div><div className="stat-label">คำสั่งซื้อวันนี้</div><div className="stat-value">{stats.orders_today}</div></div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon purple"><Receipt size={20} /></div>
+            <div><div className="stat-label">สินค้าทั้งหมด</div><div className="stat-value">{stats.total_products}</div></div>
+          </div>
         </div>
-        <ResponsiveContainer width="100%" height={280}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-            <XAxis dataKey="dateLabel" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false}
-              tickFormatter={(v) => `฿${(v/1000).toFixed(0)}k`} />
-            <Tooltip
-              contentStyle={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }}
-              labelStyle={{ color: '#94a3b8' }}
-              formatter={(v: any) => [formatCurrency(v as number), 'รายได้']}
-            />
-            <Line type="monotone" dataKey="revenue" stroke="#6366f1" strokeWidth={2} dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+      )}
 
-      <div style={{ marginTop: 16 }}>
-        <div className="card">
-          <div className="card-header">
-            <span className="card-title">จำนวนออเดอร์ 30 วันล่าสุด</span>
+      {stats && stats.low_stock_count > 0 && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: 'var(--warning-bg)', borderRadius: 'var(--radius-sm)' }}>
+            <AlertTriangle size={16} color="var(--warning)" />
+            <span style={{ fontSize: 13 }}>สต็อกต่ำกว่ากำหนด {stats.low_stock_count} รายการ</span>
           </div>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="dateLabel" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} />
-              <Tooltip
-                contentStyle={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8 }}
-                labelStyle={{ color: '#94a3b8' }}
-                formatter={(v: any) => [v, 'ออเดอร์']}
-              />
-              <Bar dataKey="orders" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+        </div>
+      )}
+
+      <div className="card" style={{ marginTop: 24 }}>
+        <div className="card-header"><span className="card-title">สาขาทั้งหมด ({branches.length})</span></div>
+        <div className="table-wrapper" style={{ boxShadow: 'none', border: 'none', padding: 0 }}>
+          <table style={{ margin: 0 }}>
+            <thead><tr><th>ชื่อสาขา</th><th>ที่อยู่</th><th>เบอร์โทร</th></tr></thead>
+            <tbody>
+              {branches.map(b => (
+                <tr key={b.id}>
+                  <td style={{ fontWeight: 600 }}>{b.name}</td>
+                  <td style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{b.address || '-'}</td>
+                  <td style={{ fontSize: 13 }}>{b.phone || '-'}</td>
+                </tr>
+              ))}
+              {branches.length === 0 && <tr><td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>ยังไม่มีข้อมูลสาขา</td></tr>}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

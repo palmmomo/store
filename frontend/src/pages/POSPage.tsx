@@ -23,7 +23,7 @@ export default function POSPage() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    productApi.getAll().then((r) => setProducts(r.data))
+    productApi.getAll().then((r: any) => setProducts(r.data))
   }, [])
 
   const categories = ['ทั้งหมด', ...Array.from(new Set(products.map((p) => p.category).filter(Boolean)))]
