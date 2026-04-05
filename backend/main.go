@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 
 	"store-backend/backend/db"
@@ -16,11 +17,20 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func main() {
+var engine *gin.Engine
+
+func init() {
+	// Minimal init if needed, but we'll do lazy init in Handler or full init in main
+}
+
+func initApp() {
+	if engine != nil {
+		return
+	}
+
 	// Load .env file robustly
 	err := godotenv.Load()
 	if err != nil {
-		log.Println("WARNING: Could not load .env file:", err)
 		// Try to fallback to ../frontend/.env or ./.env.local if they exist
 		_ = godotenv.Load("../frontend/.env")
 	}
@@ -28,9 +38,10 @@ func main() {
 	log.Println("=== STARTUP CHECKS ===")
 	log.Printf("SUPABASE_URL: '%s'\n", os.Getenv("SUPABASE_URL"))
 	if os.Getenv("SUPABASE_URL") == "" {
-		log.Println("👉 ERROR: SUPABASE_URL is EMPTY! The backend will not work properly.")
+		log.Println("👉 WARNING: SUPABASE_URL is EMPTY!")
 	}
 	log.Println("======================")
+
 	// Init Supabase client
 	db.Init()
 
@@ -39,7 +50,12 @@ func main() {
 	stockHandler := handlers.NewStockHandler(stockService)
 
 	// Setup Gin
-	r := gin.Default()
+	// Use ReleaseMode on Vercel to save logs/performance
+	if os.Getenv("VERCEL") == "1" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+	
+	engine = gin.Default()
 
 	// CORS configuration
 	frontendURL := os.Getenv("FRONTEND_URL")
@@ -47,14 +63,14 @@ func main() {
 		frontendURL = "http://localhost:5173"
 	}
 
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{frontendURL},
+	engine.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{frontendURL, "https://store-psi-bice.vercel.app"}, // Added explicit production URL
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
 	}))
 
-	public := r.Group("/api")
+	public := engine.Group("/api")
 	{
 		public.POST("/auth/login", handlers.Login)
 		public.POST("/auth/refresh", handlers.RefreshToken)
@@ -62,7 +78,7 @@ func main() {
 	}
 
 	// Protected routes (require JWT)
-	api := r.Group("/api")
+	api := engine.Group("/api")
 	api.Use(middleware.AuthMiddleware())
 	{
 		// Branch routes
@@ -127,14 +143,23 @@ func main() {
 			admin.GET("/logs", handlers.GetActivityLogs)
 		}
 	}
+}
 
+// Handler is the entry point for Vercel
+func Handler(w http.ResponseWriter, r *http.Request) {
+	initApp()
+	engine.ServeHTTP(w, r)
+}
+
+func main() {
+	initApp()
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 
 	log.Printf("Server starting on :%s", port)
-	if err := r.Run(":" + port); err != nil {
+	if err := engine.Run(":" + port); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
 }
