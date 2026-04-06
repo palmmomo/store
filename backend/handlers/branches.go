@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+	"crypto/rand"
+	"encoding/hex"
 
 	"store-backend/db"
 	"store-backend/middleware"
@@ -42,6 +44,13 @@ func GetBranches(c *gin.Context) {
 	c.JSON(http.StatusOK, branches)
 }
 
+// generateBranchID generates a short unique ID for branches
+func generateBranchID() string {
+	b := make([]byte, 4)
+	rand.Read(b)
+	return "BR-" + hex.EncodeToString(b)
+}
+
 // CreateBranch creates a new branch (superadmin only)
 func CreateBranch(c *gin.Context) {
 	var req struct {
@@ -54,11 +63,16 @@ func CreateBranch(c *gin.Context) {
 		return
 	}
 
+	branchID := generateBranchID()
+	now := time.Now()
 	data := map[string]interface{}{
-		"name":      req.Name,
-		"address":   req.Address,
-		"phone":     req.Phone,
-		"is_active": true,
+		"id":         branchID,
+		"name":       req.Name,
+		"address":    req.Address,
+		"phone":      req.Phone,
+		"is_active":  true,
+		"created_at": now,
+		"updated_at": now,
 	}
 
 	var result []branchRow
@@ -68,7 +82,12 @@ func CreateBranch(c *gin.Context) {
 	}
 
 	if len(result) == 0 {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create branch"})
+		// Return the data we sent since Supabase may not return it
+		c.JSON(http.StatusCreated, gin.H{
+			"id": branchID, "name": req.Name,
+			"address": req.Address, "phone": req.Phone,
+			"is_active": true,
+		})
 		return
 	}
 	c.JSON(http.StatusCreated, result[0])

@@ -106,6 +106,7 @@ func InitApp() {
 			stock.DELETE("/items/:id", middleware.RequireRole("superadmin", "branch_admin", "staff"), stockHandler.DeleteStockItem)
 
 			stock.POST("/purchase", middleware.RequireRole("superadmin", "branch_admin", "staff"), stockHandler.PurchaseStock)
+			stock.GET("/purchases", middleware.RequireRole("superadmin", "branch_admin", "staff"), stockHandler.GetPurchaseHistory)
 			stock.POST("/deduct", stockHandler.DeductStock)
 			stock.GET("/compare/:material_id", stockHandler.GetComparison)
 		}

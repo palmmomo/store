@@ -66,20 +66,20 @@ func (h *StockHandler) UpdateStockItem(c *gin.Context) {
 		return
 	}
 
-	res, err := h.srv.UpdateMaterial(uint(id), middleware.GetBranchID(c), req)
+	res, err := h.srv.UpdateMaterial(middleware.GetBranchID(c), uint(id), req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "แก้ไขข้อมูลสำเร็จ", "data": res})
+	c.JSON(http.StatusOK, gin.H{"data": res})
 }
 
-// 5. ลบวัสดุ (ที่ Error อยู่)
+// 5. ลบตารางวัสดุ
 func (h *StockHandler) DeleteStockItem(c *gin.Context) {
 	idStr := c.Param("id")
 	id, _ := strconv.ParseUint(idStr, 10, 32)
 
-	err := h.srv.DeleteMaterial(uint(id), middleware.GetBranchID(c))
+	err := h.srv.DeleteMaterial(middleware.GetBranchID(c), uint(id))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถลบข้อมูลได้"})
 		return
@@ -121,6 +121,16 @@ func (h *StockHandler) DeductStock(c *gin.Context) {
 func (h *StockHandler) GetComparison(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("material_id"), 10, 32)
 	res, err := h.srv.GetPriceComparison(uint(id))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": res})
+}
+
+// 9. ประวัติการซื้อทั้งหมดของสาขา
+func (h *StockHandler) GetPurchaseHistory(c *gin.Context) {
+	res, err := h.srv.GetAllPurchases(middleware.GetBranchID(c))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -10,14 +10,15 @@ import (
 
 // StockService interface
 type StockService interface {
-	CreateMaterial(branchID string, req CreateMaterialDTO) (*models.Material, error)
 	GetAllStock(branchID string) ([]models.Material, error)
 	GetStockByID(id uint, branchID string) (*models.Material, error)
-	UpdateMaterial(id uint, branchID string, req UpdateMaterialDTO) (*models.Material, error)
-	DeleteMaterial(id uint, branchID string) error
+	CreateMaterial(branchID string, req CreateMaterialDTO) (*models.Material, error)
+	UpdateMaterial(branchID string, id uint, req UpdateMaterialDTO) (*models.Material, error)
+	DeleteMaterial(branchID string, id uint) error
 	PurchaseMaterial(branchID string, req PurchaseRequestDTO) error
 	DeductMaterial(branchID string, req UsageRequestDTO) error
 	GetPriceComparison(materialID uint) ([]models.SupplierComparison, error)
+	GetAllPurchases(branchID string) ([]map[string]interface{}, error)
 }
 
 type stockService struct {
@@ -33,6 +34,7 @@ type CreateMaterialDTO struct {
 	Name          string  `json:"name" binding:"required"`
 	CategoryID    uint    `json:"category_id" binding:"required"`
 	Unit          string  `json:"unit" binding:"required"`
+	InitialStock  float64 `json:"initial_stock"`
 	MinStockLevel float64 `json:"min_stock_level"`
 }
 
@@ -47,7 +49,7 @@ type PurchaseRequestDTO struct {
 	MaterialID uint    `json:"material_id" binding:"required"`
 	SupplierID uint    `json:"supplier_id" binding:"required"`
 	Quantity   float64 `json:"quantity" binding:"required,gt=0"`
-	TotalPrice float64 `json:"total_price" binding:"required,min=0"`
+	TotalPrice float64 `json:"total_price" binding:"required,gt=0"`
 	ReceiptNo  string  `json:"receipt_no"`
 }
 
@@ -65,7 +67,7 @@ func (s *stockService) CreateMaterial(branchID string, req CreateMaterialDTO) (*
 		Name:          req.Name,
 		CategoryID:    req.CategoryID,
 		Unit:          req.Unit,
-		CurrentStock:  0,
+		CurrentStock:  req.InitialStock, // กำหนดจำนวนเริ่มต้น
 		MinStockLevel: req.MinStockLevel,
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
@@ -85,7 +87,7 @@ func (s *stockService) GetStockByID(id uint, branchID string) (*models.Material,
 }
 
 // UpdateMaterial
-func (s *stockService) UpdateMaterial(id uint, branchID string, req UpdateMaterialDTO) (*models.Material, error) {
+func (s *stockService) UpdateMaterial(branchID string, id uint, req UpdateMaterialDTO) (*models.Material, error) {
 	material, err := s.repo.FindMaterialByID(id, branchID)
 	if err != nil {
 		return nil, errors.New("ไม่พบวัสดุที่ต้องการแก้ไข")
@@ -110,7 +112,7 @@ func (s *stockService) UpdateMaterial(id uint, branchID string, req UpdateMateri
 }
 
 // DeleteMaterial
-func (s *stockService) DeleteMaterial(id uint, branchID string) error {
+func (s *stockService) DeleteMaterial(branchID string, id uint) error {
 	return s.repo.DeleteMaterial(id, branchID)
 }
 
@@ -220,11 +222,15 @@ func (s *stockService) GetPriceComparison(materialID uint) ([]models.SupplierCom
 		}
 	}
 
-	// 3. แปลง Map กลับเป็น Slice เพื่อส่งออกไปยังหน้าบ้าน
-	var results []models.SupplierComparison
+	// 4. แปลงกลับเป็น Slice เพื่อ Return ให้ API
+	var result []models.SupplierComparison
 	for _, v := range comparisonMap {
-		results = append(results, v)
+		result = append(result, v)
 	}
 
-	return results, nil
+	return result, nil
+}
+
+func (s *stockService) GetAllPurchases(branchID string) ([]map[string]interface{}, error) {
+	return s.repo.GetAllPurchases(branchID)
 }
