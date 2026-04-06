@@ -56,11 +56,12 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">อีเมล</label>
+          <div className="form-group" style={{ textAlign: 'center' }}>
+            <label className="form-label" style={{ textAlign: 'center', display: 'block' }}>อีเมล</label>
             <input
               id="login-email"
               className="form-input"
+              style={{ textAlign: 'center' }}
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
@@ -69,11 +70,12 @@ export default function LoginPage() {
               autoFocus
             />
           </div>
-          <div className="form-group">
-            <label className="form-label">รหัสผ่าน</label>
+          <div className="form-group" style={{ textAlign: 'center' }}>
+            <label className="form-label" style={{ textAlign: 'center', display: 'block' }}>รหัสผ่าน</label>
             <input
               id="login-password"
               className="form-input"
+              style={{ textAlign: 'center' }}
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -100,7 +102,7 @@ export default function LoginPage() {
             className="btn btn-primary"
             type="submit"
             disabled={loading}
-            style={{ width: '100%', marginTop: 8, padding: '10px 0', fontSize: 14 }}
+            style={{ width: '100%', marginTop: 8, padding: '10px 0', fontSize: 14, justifyContent: 'center' }}
           >
             {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
           </button>

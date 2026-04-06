@@ -25,7 +25,7 @@ export default function StockPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingItem, setEditingItem] = useState<Material | null>(null)
   const [showAdjust, setShowAdjust] = useState<Material | null>(null)
-  const [form, setForm] = useState({ name: '', category_id: 1, unit: 'ชิ้น', min_stock_level: 0 })
+  const [form, setForm] = useState({ name: '', category_id: 1, unit: 'ชิ้น', initial_stock: 0, min_stock_level: 0 })
   const [adjustForm, setAdjustForm] = useState({ type: 'add' as 'add' | 'deduct', quantity: 0, reason: '' })
 
   const loadStock = async () => {
@@ -49,7 +49,7 @@ export default function StockPage() {
       await stockApi.create(form)
       toast.success('เพิ่มวัสดุสำเร็จ')
       setShowForm(false)
-      setForm({ name: '', category_id: 1, unit: 'ชิ้น', min_stock_level: 0 })
+      setForm({ name: '', category_id: 1, unit: 'ชิ้น', initial_stock: 0, min_stock_level: 0 })
       loadStock()
     } catch (err) {
       toast.error('ไม่สามารถเพิ่มวัสดุได้')
@@ -112,13 +112,13 @@ export default function StockPage() {
 
   const openCreate = () => {
     setEditingItem(null)
-    setForm({ name: '', category_id: 1, unit: 'ชิ้น', min_stock_level: 0 })
+    setForm({ name: '', category_id: 1, unit: 'ชิ้น', initial_stock: 0, min_stock_level: 0 })
     setShowForm(true)
   }
 
   const openEdit = (item: Material) => {
     setEditingItem(item)
-    setForm({ name: item.name, category_id: item.category_id, unit: item.unit, min_stock_level: item.min_stock_level })
+    setForm({ name: item.name, category_id: item.category_id, unit: item.unit, initial_stock: 0, min_stock_level: item.min_stock_level })
     setShowForm(true)
   }
 
@@ -211,9 +211,15 @@ export default function StockPage() {
                 <option value="ลิตร">ลิตร</option>
               </select>
             </div>
+            {!editingItem && (
+              <div className="form-group">
+                <label className="form-label">จำนวนเริ่มต้น (ที่ซื้อตั้งต้น)</label>
+                <input className="form-input" type="number" min="0" value={form.initial_stock} onChange={e => setForm({ ...form, initial_stock: parseFloat(e.target.value) || 0 })} />
+              </div>
+            )}
             <div className="form-group">
-              <label className="form-label">สต็อกขั้นต่ำ</label>
-              <input className="form-input" type="number" value={form.min_stock_level} onChange={e => setForm({ ...form, min_stock_level: parseFloat(e.target.value) || 0 })} />
+              <label className="form-label">แจ้งเตือนสต็อกต่ำเมื่อน้อยกว่า</label>
+              <input className="form-input" type="number" min="0" value={form.min_stock_level} onChange={e => setForm({ ...form, min_stock_level: parseFloat(e.target.value) || 0 })} />
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowForm(false)}>ยกเลิก</button>
@@ -238,7 +244,7 @@ export default function StockPage() {
             </p>
             <div className="form-group">
               <label className="form-label">จำนวน ({showAdjust.unit})</label>
-              <input className="form-input" type="number" value={adjustForm.quantity || ''} onChange={e => setAdjustForm({ ...adjustForm, quantity: parseFloat(e.target.value) || 0 })} autoFocus />
+              <input className="form-input" type="number" min="0" step="0.5" value={adjustForm.quantity || ''} onChange={e => setAdjustForm({ ...adjustForm, quantity: parseFloat(e.target.value) || 0 })} autoFocus />
             </div>
             {adjustForm.type === 'deduct' && (
               <div className="form-group">
