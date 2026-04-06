@@ -15,11 +15,13 @@ const navItems = [
   { to: '/summary', icon: <TrendingUp size={18} />, label: 'สรุปรายวัน', roles: ['superadmin', 'admin'] },
   { to: '/purchases', icon: <ShoppingCart size={18} />, label: 'ประวัติการจัดซื้อ', roles: ['superadmin', 'admin', 'staff'] },
   { to: '/quotation', icon: <FileText size={18} />, label: 'ใบเสนอราคา', roles: ['superadmin', 'admin', 'staff'] },
-  { to: '/logs', icon: <FileText size={18} />, label: 'บันทึกกิจกรรม', roles: ['superadmin', 'admin'] },
+  { to: '/sales-history', icon: <TrendingUp size={18} />, label: 'ประวัติยอดขาย', roles: ['superadmin', 'admin', 'staff'] },
 ]
 const adminItems = [
   { to: '/admin/branches', icon: <Building2 size={18} />, label: 'จัดการสาขา' },
   { to: '/admin/users', icon: <Users size={18} />, label: 'จัดการผู้ใช้' },
+  { to: '/admin/expenses', icon: <FileText size={18} />, label: 'รายจ่ายทั้งหมด' },
+  { to: '/admin/sales-history', icon: <TrendingUp size={18} />, label: 'ประวัติยอดขายทั้งหมด' },
 ]
 
 export default function Sidebar() {

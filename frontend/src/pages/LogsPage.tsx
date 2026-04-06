@@ -31,11 +31,13 @@ export default function LogsPage() {
         adminApi.getLogs(selectedBranch),
         branchApi.getAll(),
       ])
-      setLogs(Array.isArray(logsRes.data) ? logsRes.data : [])
-      setBranches(Array.isArray(branchRes.data) ? branchRes.data : [])
+      setLogs(Array.isArray(logsRes?.data) ? logsRes.data : [])
+      setBranches(Array.isArray(branchRes?.data) ? branchRes.data : [])
     } catch (err) {
       console.error('Failed to load logs', err)
-      setError(true)
+      // Show empty state instead of error
+      setLogs([])
+      setBranches([])
     } finally {
       setLoading(false)
     }

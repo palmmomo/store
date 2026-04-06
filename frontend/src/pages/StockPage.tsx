@@ -64,8 +64,9 @@ export default function StockPage() {
       setShowForm(false)
       setForm({ name: '', category_id: 1, unit: 'ชิ้น', initial_stock: 0, min_stock_level: 0 })
       loadStock()
-    } catch (err) {
-      toast.error('ไม่สามารถเพิ่มวัสดุได้')
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || 'ไม่สามารถเพิ่มวัสดุได้'
+      toast.error(msg)
       console.error(err)
     }
   }
@@ -78,8 +79,9 @@ export default function StockPage() {
       setEditingItem(null)
       setShowForm(false)
       loadStock()
-    } catch (err) {
-      toast.error('ไม่สามารถแก้ไขได้')
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || 'ไม่สามารถแก้ไขได้'
+      toast.error(msg)
       console.error(err)
     }
   }
@@ -90,8 +92,9 @@ export default function StockPage() {
       await stockApi.delete(id)
       toast.success('ลบวัสดุสำเร็จ')
       loadStock()
-    } catch (err) {
-      toast.error('ไม่สามารถลบได้')
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || 'ไม่สามารถลบได้'
+      toast.error(msg)
       console.error(err)
     }
   }

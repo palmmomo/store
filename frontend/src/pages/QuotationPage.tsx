@@ -1,149 +1,156 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { branchApi } from '../api/client'
-import { FileText, Download } from 'lucide-react'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
+import { FileText, Printer } from 'lucide-react'
+import { useReactToPrint } from 'react-to-print'
+
+interface QuotationItem {
+  id: number
+  name: string
+  width: number
+  height: number
+  area: number
+  pricePerSqM: number
+  total: number
+}
+
+interface AddOnItem {
+  name: string
+  price: number
+}
 
 export default function QuotationPage() {
+  const printRef = useRef<HTMLDivElement>(null)
   const [branches, setBranches] = useState<any[]>([])
   const [selectedBranch, setSelectedBranch] = useState<any>(null)
   
   // Customer Info
   const [custName, setCustName] = useState('')
   const [custPhone, setCustPhone] = useState('')
-  const [custAddress, setCustAddress] = useState('')
   const [custType, setCustType] = useState('เอกชน')
   
-  // Signage Info
-  const [width, setWidth] = useState('')
-  const [height, setHeight] = useState('')
-  const [pricePerSqM, setPricePerSqM] = useState('')
+  // Items
+  const [items, setItems] = useState<QuotationItem[]>([])
+  const [itemName, setItemName] = useState('')
+  const [itemWidth, setItemWidth] = useState('')
+  const [itemHeight, setItemHeight] = useState('')
+  const [itemPricePerSqM, setItemPricePerSqM] = useState('')
   
   // Add-ons
-  const [hasInstall, setHasInstall] = useState(false)
-  const [installPrice, setInstallPrice] = useState('')
-  
-  const [hasSteel, setHasSteel] = useState(false)
-  const [steelPrice, setSteelPrice] = useState('')
-  
-  const [hasWood, setHasWood] = useState(false)
-  const [woodPrice, setWoodPrice] = useState('')
-  
-  const [hasOther, setHasOther] = useState(false)
-  const [otherLabel, setOtherLabel] = useState('อื่นๆ')
-  const [otherPrice, setOtherPrice] = useState('')
+  const [addOns, setAddOns] = useState<AddOnItem[]>([])
+  const [addOnName, setAddOnName] = useState('')
+  const [addOnPrice, setAddOnPrice] = useState('')
+
+  // Quotation ID
+  const [quotationId, setQuotationId] = useState('')
 
   useEffect(() => {
-    branchApi.getAll().then(res => setBranches(res.data || []))
+    branchApi.getAll().then(res => {
+      const data = res?.data || []
+      setBranches(data)
+      if (data.length > 0 && !selectedBranch) {
+        setSelectedBranch(data[0])
+      }
+    })
+    // Generate quotation ID
+    const today = new Date()
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+    setQuotationId(`QT-${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}-${random}`)
   }, [])
 
-  // Calculations
-  const w = parseFloat(width) || 0
-  const h = parseFloat(height) || 0
-  const area = w * h
-  const pps = parseFloat(pricePerSqM) || 0
-  const signTotal = area * pps
-  
-  const addOnTotal = 
-    (hasInstall ? parseFloat(installPrice) || 0 : 0) +
-    (hasSteel ? parseFloat(steelPrice) || 0 : 0) +
-    (hasWood ? parseFloat(woodPrice) || 0 : 0) +
-    (hasOther ? parseFloat(otherPrice) || 0 : 0)
+  const handleAddItem = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!itemName || !itemWidth || !itemHeight || !itemPricePerSqM) return
     
-  const grandTotal = signTotal + addOnTotal
-
-  const generatePDF = () => {
-    const doc = new jsPDF()
-
-    // Header Logo
-    if (selectedBranch?.logo_url) {
-      try {
-        doc.addImage(selectedBranch.logo_url, 'PNG', 15, 10, 30, 30) // Assuming PNG or JPEG
-      } catch (err) {
-        console.warn('Could not load logo image for PDF:', err)
-      }
-    }
-
-    // Branch Name Header
-    doc.setFontSize(16)
-    if (selectedBranch) {
-      doc.text(selectedBranch.name, 50, 18)
-      doc.setFontSize(10)
-      if (selectedBranch.address) doc.text(selectedBranch.address, 50, 25)
-    }
-
-    // Quotation ID
-    const today = new Date()
-    const qtId = `QT-${today.getFullYear()}${String(today.getMonth()+1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}-${String(Math.floor(Math.random()*1000)).padStart(3, '0')}`
-    doc.setFontSize(20)
-    doc.text('ใบเสนอราคา', 195, 20, { align: 'right' })
-    doc.setFontSize(12)
-    doc.text(`เลขที่: ${qtId}`, 195, 28, { align: 'right' })
-
-    // Customer Info
-    doc.setFontSize(10)
-    doc.text(`ชื่อลูกค้า: ${custName || '-'}`, 15, 50)
-    doc.text(`เบอร์โทร: ${custPhone || '-'}`, 15, 57)
-    doc.text(`ประเภทลูกค้า: ${custType}`, 120, 50)
-
-    // Setup Table Data
-    const tableBody = []
+    const w = parseFloat(itemWidth) || 0
+    const h = parseFloat(itemHeight) || 0
+    const pps = parseFloat(itemPricePerSqM) || 0
+    const area = w * h
+    const total = area * pps
     
-    // 1. Signage
-    if (signTotal > 0) {
-      tableBody.push([
-        `งานพิมพ์ป้าย`,
-        `${w.toFixed(2)}`,
-        `${h.toFixed(2)}`,
-        `${area.toFixed(2)}`,
-        `${pps.toLocaleString()}`,
-        `${signTotal.toLocaleString()}`
-      ])
-    }
+    setItems([...items, {
+      id: items.length + 1,
+      name: itemName,
+      width: w,
+      height: h,
+      area,
+      pricePerSqM: pps,
+      total
+    }])
     
-    // Add-ons
-    if (hasInstall) tableBody.push(['ค่าติดตั้ง', '-', '-', '-', '-', parseFloat(installPrice || '0').toLocaleString()])
-    if (hasSteel) tableBody.push(['ค่าโครงเหล็ก', '-', '-', '-', '-', parseFloat(steelPrice || '0').toLocaleString()])
-    if (hasWood) tableBody.push(['ค่าโครงไม้', '-', '-', '-', '-', parseFloat(woodPrice || '0').toLocaleString()])
-    if (hasOther) tableBody.push([otherLabel || 'อื่นๆ', '-', '-', '-', '-', parseFloat(otherPrice || '0').toLocaleString()])
+    setItemName('')
+    setItemWidth('')
+    setItemHeight('')
+    setItemPricePerSqM('')
+  }
 
-    autoTable(doc, {
-      startY: 65,
-      head: [['รายการ', 'กว้าง(ม.)', 'ยาว(ม.)', 'ตร.ม.', 'ราคา/ตร.ม.', 'ยอดรวม']],
-      body: tableBody,
-      theme: 'grid',
-      styles: { font: 'helvetica' }, // Use helvetica fallback for missing TH fonts for now
-      headStyles: { fillColor: [41, 128, 185] }
-    })
+  const handleAddAddOn = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!addOnName || !addOnPrice) return
+    
+    setAddOns([...addOns, {
+      name: addOnName,
+      price: parseFloat(addOnPrice) || 0
+    }])
+    
+    setAddOnName('')
+    setAddOnPrice('')
+  }
 
-    // Total
-    // @ts-ignore
-    const finalY = doc.lastAutoTable.finalY || 65
-    doc.setFontSize(12)
-    doc.text(`ยอดรวมสุทธิ: ${grandTotal.toLocaleString()} บาท`, 195, finalY + 15, { align: 'right' })
+  const removeItem = (id: number) => {
+    setItems(items.filter(i => i.id !== id))
+  }
 
-    // Footer
-    doc.setFontSize(10)
-    doc.text(`วันที่ออกเอกสาร: ${today.toLocaleDateString()}`, 15, 280)
-    doc.text(`ขอบคุณที่ใช้บริการ`, 195, 280, { align: 'right' })
+  const removeAddOn = (index: number) => {
+    setAddOns(addOns.filter((_, i) => i !== index))
+  }
 
-    doc.save(`${qtId}.pdf`)
+  const itemsTotal = items.reduce((sum, item) => sum + item.total, 0)
+  const addOnsTotal = addOns.reduce((sum, addon) => sum + addon.price, 0)
+  const grandTotal = itemsTotal + addOnsTotal
+
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: quotationId,
+  })
+
+  // Format date in Buddhist Era
+  const formatDate = () => {
+    const date = new Date()
+    const day = date.getDate()
+    const month = date.getMonth() + 1
+    const year = date.getFullYear() + 543
+    return `${day}/${month}/${year}`
   }
 
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
       <div className="page-header" style={{ marginBottom: 20 }}>
         <div>
-          <h1 className="page-title">สร้างใบเสนอราคา (PDF)</h1>
-          <p className="page-subtitle">ออกใบเสนอราคาให้ลูกค้า พร้อมรูปแบบมาตรฐาน</p>
+          <h1 className="page-title"><FileText size={24} style={{ verticalAlign: 'middle', marginRight: 8 }} /> สร้างใบเสนอราคา</h1>
+          <p className="page-subtitle">ออกใบเสนอราคาให้ลูกค้า พร้อมพิมพ์หรือบันทึก PDF</p>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 300px', gap: 24, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'start' }}>
         
         {/* Left Side: Forms */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           
+          {/* Branch Selection */}
+          <div className="card">
+            <h3 style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 12 }}>ออกในนามสาขา</h3>
+            <select 
+              className="form-input" 
+              value={selectedBranch?.id || ''} 
+              onChange={e => setSelectedBranch(branches.find(b => b.id === e.target.value))}
+            >
+              {branches.map((b: any) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Customer Info */}
           <div className="card">
             <h2 style={{ fontSize: 16, marginBottom: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
               <FileText size={18} /> ข้อมูลลูกค้า
@@ -151,14 +158,23 @@ export default function QuotationPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div className="form-group">
                 <label className="form-label">ชื่อลูกค้า</label>
-                <input className="form-input" value={custName} onChange={e => setCustName(e.target.value)} placeholder="ชื่อ นามสกุล / ชื่อบริษัท" />
+                <input 
+                  className="form-input" 
+                  value={custName} 
+                  onChange={e => setCustName(e.target.value)} 
+                  placeholder="ชื่อ นามสกุล / ชื่อบริษัท" 
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">เบอร์โทรศัพท์</label>
-                <input className="form-input" value={custPhone} onChange={e => setCustPhone(e.target.value)} placeholder="08x-xxx-xxxx" />
+                <input 
+                  className="form-input" 
+                  value={custPhone} 
+                  onChange={e => setCustPhone(e.target.value)} 
+                  placeholder="08x-xxx-xxxx" 
+                />
               </div>
             </div>
-            
             <div className="form-group" style={{ marginTop: 12 }}>
               <label className="form-label">ประเภทลูกค้า</label>
               <select className="form-input" value={custType} onChange={e => setCustType(e.target.value)}>
@@ -167,116 +183,445 @@ export default function QuotationPage() {
                 <option value="อบต.">อบต. / หน่วยงานท้องถิ่น</option>
               </select>
             </div>
-
-            <div className="form-group" style={{ marginTop: 12 }}>
-              <label className="form-label">ที่อยู่จัดส่ง / ติดตั้ง</label>
-              <textarea className="form-input" rows={2} value={custAddress} onChange={e => setCustAddress(e.target.value)} placeholder="ระบุที่อยู่ครบถ้วน..." />
-            </div>
           </div>
 
+          {/* Items Form */}
           <div className="card">
-            <h2 style={{ fontSize: 16, marginBottom: 16 }}>ข้อมูลป้าย / งานพิมพ์</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+            <h2 style={{ fontSize: 16, marginBottom: 16 }}>เพิ่มรายการป้าย</h2>
+            <form onSubmit={handleAddItem}>
               <div className="form-group">
-                <label className="form-label">ความกว้าง (เมตร)</label>
-                <input type="number" min="0" step="0.01" className="form-input" value={width} onChange={e => setWidth(e.target.value)} placeholder="0.00" />
+                <label className="form-label">ชื่องาน / รายการ</label>
+                <input 
+                  className="form-input" 
+                  value={itemName} 
+                  onChange={e => setItemName(e.target.value)} 
+                  placeholder="เช่น ไวนิลโปรโมชั่นหน้าร้าน"
+                />
               </div>
-              <div className="form-group">
-                <label className="form-label">ความยาว (เมตร)</label>
-                <input type="number" min="0" step="0.01" className="form-input" value={height} onChange={e => setHeight(e.target.value)} placeholder="0.00" />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 12 }}>
+                <div className="form-group">
+                  <label className="form-label">กว้าง (ม.)</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    min="0"
+                    className="form-input" 
+                    value={itemWidth} 
+                    onChange={e => setItemWidth(e.target.value)} 
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">ยาว (ม.)</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    min="0"
+                    className="form-input" 
+                    value={itemHeight} 
+                    onChange={e => setItemHeight(e.target.value)} 
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">ราคา/ตร.ม.</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    min="0"
+                    className="form-input" 
+                    value={itemPricePerSqM} 
+                    onChange={e => setItemPricePerSqM(e.target.value)} 
+                    placeholder="0.00"
+                  />
+                </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">ราคา/ตร.ม. (บาท)</label>
-                <input type="number" min="0" step="0.01" className="form-input" value={pricePerSqM} onChange={e => setPricePerSqM(e.target.value)} placeholder="0.00" />
+              <button type="submit" className="btn btn-primary" style={{ marginTop: 12, width: '100%' }}>
+                + เพิ่มรายการ
+              </button>
+            </form>
+
+            {/* Items List */}
+            {items.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <h4 style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>รายการที่เพิ่ม ({items.length})</h4>
+                {items.map(item => (
+                  <div key={item.id} style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    padding: '8px 12px',
+                    background: 'var(--bg-box)',
+                    borderRadius: 'var(--radius-sm)',
+                    marginBottom: 8,
+                    fontSize: 13
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 500 }}>{item.name}</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                        {item.width} x {item.height} m = {item.area.toFixed(2)} ตร.ม. @ {item.pricePerSqM.toLocaleString()}฿
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontWeight: 600 }}>{item.total.toLocaleString()}฿</span>
+                      <button 
+                        className="btn-icon delete" 
+                        onClick={() => removeItem(item.id)}
+                        style={{ padding: 4 }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-            <div style={{ background: 'var(--bg-box)', padding: 12, borderRadius: 'var(--radius-sm)', marginTop: 12, display: 'flex', justifyContent: 'space-between' }}>
-              <div>พื้นที่รวม: <strong>{area > 0 ? area.toFixed(2) : '0.00'} ตร.ม.</strong></div>
-              <div>ราคาป้าย: <strong>{signTotal > 0 ? signTotal.toLocaleString() : '0'} บาท</strong></div>
-            </div>
+            )}
           </div>
 
+          {/* Add-ons Form */}
           <div className="card">
-            <h2 style={{ fontSize: 16, marginBottom: 16 }}>Add-on Costs (ค่าใช้จ่ายเพิ่มเติม)</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <input type="checkbox" id="c-install" checked={hasInstall} onChange={e => setHasInstall(e.target.checked)} style={{ width: 18, height: 18 }} />
-                <label htmlFor="c-install" style={{ flex: 1, cursor: 'pointer' }}>ค่าช่างติดตั้ง</label>
-                {hasInstall && <input type="number" min="0" className="form-input" style={{ width: 120, padding: '4px 8px' }} placeholder="บาท" value={installPrice} onChange={e => setInstallPrice(e.target.value)} />}
+            <h2 style={{ fontSize: 16, marginBottom: 16 }}>ค่าใช้จ่ายเพิ่มเติม</h2>
+            <form onSubmit={handleAddAddOn}>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label className="form-label">รายการ</label>
+                  <input 
+                    className="form-input" 
+                    value={addOnName} 
+                    onChange={e => setAddOnName(e.target.value)} 
+                    placeholder="เช่น ค่าติดตั้ง, ค่าโครง"
+                    list="addon-suggestions"
+                  />
+                  <datalist id="addon-suggestions">
+                    <option value="ค่าติดตั้ง" />
+                    <option value="ค่าโครงเหล็ก" />
+                    <option value="ค่าโครงไม้" />
+                    <option value="ค่าขนส่ง" />
+                  </datalist>
+                </div>
+                <div className="form-group" style={{ width: 120 }}>
+                  <label className="form-label">ราคา</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    min="0"
+                    className="form-input" 
+                    value={addOnPrice} 
+                    onChange={e => setAddOnPrice(e.target.value)} 
+                    placeholder="0.00"
+                  />
+                </div>
               </div>
+              <button type="submit" className="btn btn-secondary" style={{ marginTop: 12, width: '100%' }}>
+                + เพิ่มค่าใช้จ่าย
+              </button>
+            </form>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <input type="checkbox" id="c-steel" checked={hasSteel} onChange={e => setHasSteel(e.target.checked)} style={{ width: 18, height: 18 }} />
-                <label htmlFor="c-steel" style={{ flex: 1, cursor: 'pointer' }}>ค่าโครงเหล็ก</label>
-                {hasSteel && <input type="number" min="0" className="form-input" style={{ width: 120, padding: '4px 8px' }} placeholder="บาท" value={steelPrice} onChange={e => setSteelPrice(e.target.value)} />}
+            {/* Add-ons List */}
+            {addOns.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                {addOns.map((addon, idx) => (
+                  <div key={idx} style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    padding: '6px 12px',
+                    background: 'var(--bg-box)',
+                    borderRadius: 'var(--radius-sm)',
+                    marginBottom: 6,
+                    fontSize: 13
+                  }}>
+                    <span>{addon.name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span>{addon.price.toLocaleString()}฿</span>
+                      <button 
+                        className="btn-icon delete" 
+                        onClick={() => removeAddOn(idx)}
+                        style={{ padding: 4 }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <input type="checkbox" id="c-wood" checked={hasWood} onChange={e => setHasWood(e.target.checked)} style={{ width: 18, height: 18 }} />
-                <label htmlFor="c-wood" style={{ flex: 1, cursor: 'pointer' }}>ค่าโครงไม้</label>
-                {hasWood && <input type="number" min="0" className="form-input" style={{ width: 120, padding: '4px 8px' }} placeholder="บาท" value={woodPrice} onChange={e => setWoodPrice(e.target.value)} />}
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <input type="checkbox" id="c-other" checked={hasOther} onChange={e => setHasOther(e.target.checked)} style={{ width: 18, height: 18 }} />
-                {hasOther ? (
-                  <input className="form-input" style={{ flex: 1, padding: '4px 8px' }} value={otherLabel} onChange={e => setOtherLabel(e.target.value)} />
-                ) : (
-                  <label htmlFor="c-other" style={{ flex: 1, cursor: 'pointer' }}>อื่นๆ</label>
-                )}
-                {hasOther && <input type="number" min="0" className="form-input" style={{ width: 120, padding: '4px 8px' }} placeholder="บาท" value={otherPrice} onChange={e => setOtherPrice(e.target.value)} />}
-              </div>
-
-            </div>
+            )}
           </div>
 
         </div>
 
-        {/* Right Side: Summary & Actions */}
-        <div style={{ position: 'sticky', top: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {/* Right Side: Preview */}
+        <div style={{ position: 'sticky', top: 20 }}>
           
-          <div className="card">
-            <h3 style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 12 }}>ออกในนามสาขา</h3>
-            <select className="form-input" value={selectedBranch?.id || ''} onChange={e => setSelectedBranch(branches.find(b => b.id === e.target.value))}>
-              <option value="">-- เลือกสาขา --</option>
-              {branches.map((b: any) => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="card" style={{ background: 'var(--bg-box)' }}>
-            <h3 style={{ fontSize: 16, marginBottom: 12 }}>สรุปยอดรวม</h3>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 14, color: 'var(--text-muted)' }}>
-              <span>ราคาป้าย</span>
-              <span>{signTotal.toLocaleString()}.-</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, fontSize: 14, color: 'var(--text-muted)' }}>
-              <span>ค่า Add-on รวม</span>
-              <span>{addOnTotal.toLocaleString()}.-</span>
-            </div>
-            
-            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 18, color: 'var(--primary)' }}>
-              <span>ยอดสุทธิ</span>
-              <span>{grandTotal.toLocaleString()} บาท</span>
-            </div>
-          </div>
-
+          {/* Print Button */}
           <button 
             className="btn btn-primary" 
-            style={{ padding: '16px', fontSize: 16, display: 'flex', justifyContent: 'center', fontWeight: 'bold' }}
-            disabled={grandTotal <= 0 || !selectedBranch}
-            onClick={generatePDF}
+            style={{ 
+              width: '100%', 
+              padding: '14px', 
+              fontSize: 16, 
+              marginBottom: 16,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 8
+            }}
+            onClick={handlePrint}
+            disabled={items.length === 0 || !selectedBranch}
           >
-            <Download size={20} /> ดาวน์โหลด PDF
+            <Printer size={20} /> พิมพ์ / บันทึก PDF
           </button>
-          
-          {!selectedBranch && <p style={{ fontSize: 12, color: 'red', textAlign: 'center', margin: 0 }}>* กรุณาเลือกสาขาประทับตรา</p>}
+
+          {/* Preview Container */}
+          <div 
+            ref={printRef}
+            className="quotation-preview"
+            style={{
+              background: 'white',
+              padding: '40px',
+              borderRadius: '4px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+              fontFamily: "'Sarabun', 'TH Sarabun New', sans-serif",
+              color: '#333'
+            }}
+          >
+            {/* Quotation Document */}
+            <div style={{ maxWidth: '100%' }}>
+              
+              {/* Header */}
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'flex-start',
+                marginBottom: 24,
+                paddingBottom: 16,
+                borderBottom: '2px solid #2563eb'
+              }}>
+                <div>
+                  {selectedBranch?.logo_url ? (
+                    <img 
+                      src={selectedBranch.logo_url} 
+                      alt="logo" 
+                      style={{ height: 60, marginBottom: 8 }}
+                    />
+                  ) : (
+                    <div style={{ 
+                      width: 60, 
+                      height: 60, 
+                      background: '#2563eb', 
+                      borderRadius: 8,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontSize: 24,
+                      fontWeight: 'bold',
+                      marginBottom: 8
+                    }}>
+                      {selectedBranch?.name?.[0] || 'Q'}
+                    </div>
+                  )}
+                  <h2 style={{ margin: 0, fontSize: 20, fontWeight: 'bold', color: '#1e40af' }}>
+                    {selectedBranch?.name || 'ร้านป้ายไวนิล'}
+                  </h2>
+                  <p style={{ margin: '4px 0 0 0', fontSize: 12, color: '#666' }}>
+                    {selectedBranch?.address || ''}
+                  </p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <h1 style={{ 
+                    margin: 0, 
+                    fontSize: 24, 
+                    fontWeight: 'bold', 
+                    color: '#2563eb',
+                    letterSpacing: '2px'
+                  }}>
+                    ใบเสนอราคา
+                  </h1>
+                  <p style={{ margin: '8px 0 0 0', fontSize: 13, color: '#666' }}>
+                    เลขที่: {quotationId}
+                  </p>
+                  <p style={{ margin: '4px 0 0 0', fontSize: 13, color: '#666' }}>
+                    วันที่: {formatDate()}
+                  </p>
+                </div>
+              </div>
+
+              {/* Customer Info */}
+              <div style={{ 
+                background: '#f8fafc', 
+                padding: 16, 
+                borderRadius: 8,
+                marginBottom: 24
+              }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: 14, fontWeight: 'bold', color: '#374151' }}>
+                  ข้อมูลลูกค้า
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', fontSize: 13 }}>
+                  <div><strong>ชื่อลูกค้า:</strong> {custName || '-'}</div>
+                  <div><strong>เบอร์โทร:</strong> {custPhone || '-'}</div>
+                  <div><strong>ประเภท:</strong> {custType}</div>
+                </div>
+              </div>
+
+              {/* Items Table */}
+              {items.length > 0 && (
+                <div style={{ marginBottom: 24 }}>
+                  <h3 style={{ margin: '0 0 12px 0', fontSize: 14, fontWeight: 'bold', color: '#374151' }}>
+                    รายการสินค้า
+                  </h3>
+                  <table style={{ 
+                    width: '100%', 
+                    borderCollapse: 'collapse', 
+                    fontSize: 12,
+                    border: '1px solid #e5e7eb'
+                  }}>
+                    <thead>
+                      <tr style={{ background: '#2563eb', color: 'white' }}>
+                        <th style={{ padding: '10px 8px', textAlign: 'center', border: '1px solid #1d4ed8' }}>#</th>
+                        <th style={{ padding: '10px 8px', textAlign: 'left', border: '1px solid #1d4ed8' }}>รายการ</th>
+                        <th style={{ padding: '10px 8px', textAlign: 'right', border: '1px solid #1d4ed8' }}>กว้าง(ม.)</th>
+                        <th style={{ padding: '10px 8px', textAlign: 'right', border: '1px solid #1d4ed8' }}>ยาว(ม.)</th>
+                        <th style={{ padding: '10px 8px', textAlign: 'right', border: '1px solid #1d4ed8' }}>ตร.ม.</th>
+                        <th style={{ padding: '10px 8px', textAlign: 'right', border: '1px solid #1d4ed8' }}>ราคา/ตร.ม.</th>
+                        <th style={{ padding: '10px 8px', textAlign: 'right', border: '1px solid #1d4ed8' }}>รวม</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((item, idx) => (
+                        <tr key={item.id} style={{ background: idx % 2 === 0 ? 'white' : '#f9fafb' }}>
+                          <td style={{ padding: '8px', textAlign: 'center', border: '1px solid #e5e7eb' }}>{idx + 1}</td>
+                          <td style={{ padding: '8px', border: '1px solid #e5e7eb' }}>{item.name}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', border: '1px solid #e5e7eb' }}>{item.width.toFixed(2)}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', border: '1px solid #e5e7eb' }}>{item.height.toFixed(2)}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', border: '1px solid #e5e7eb' }}>{item.area.toFixed(2)}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', border: '1px solid #e5e7eb' }}>{item.pricePerSqM.toLocaleString()}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', border: '1px solid #e5e7eb', fontWeight: 600 }}>{item.total.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Add-ons */}
+              {addOns.length > 0 && (
+                <div style={{ marginBottom: 24 }}>
+                  <h3 style={{ margin: '0 0 12px 0', fontSize: 14, fontWeight: 'bold', color: '#374151' }}>
+                    ค่าใช้จ่ายเพิ่มเติม
+                  </h3>
+                  <table style={{ 
+                    width: '100%', 
+                    borderCollapse: 'collapse', 
+                    fontSize: 12,
+                    border: '1px solid #e5e7eb'
+                  }}>
+                    <thead>
+                      <tr style={{ background: '#64748b', color: 'white' }}>
+                        <th style={{ padding: '10px 8px', textAlign: 'left', border: '1px solid #475569' }}>รายการ</th>
+                        <th style={{ padding: '10px 8px', textAlign: 'right', border: '1px solid #475569' }}>จำนวนเงิน</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {addOns.map((addon, idx) => (
+                        <tr key={idx} style={{ background: idx % 2 === 0 ? 'white' : '#f9fafb' }}>
+                          <td style={{ padding: '8px', border: '1px solid #e5e7eb' }}>{addon.name}</td>
+                          <td style={{ padding: '8px', textAlign: 'right', border: '1px solid #e5e7eb', fontWeight: 600 }}>{addon.price.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Totals */}
+              <div style={{ 
+                background: '#f0f9ff', 
+                padding: 20, 
+                borderRadius: 8,
+                border: '2px solid #2563eb'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                  <span>ราคาสินค้ารวม:</span>
+                  <span>{itemsTotal.toLocaleString()} บาท</span>
+                </div>
+                {addOnsTotal > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                    <span>ค่าใช้จ่ายเพิ่มเติม:</span>
+                    <span>{addOnsTotal.toLocaleString()} บาท</span>
+                  </div>
+                )}
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  marginTop: 12,
+                  paddingTop: 12,
+                  borderTop: '2px solid #2563eb',
+                  fontSize: 18,
+                  fontWeight: 'bold',
+                  color: '#1e40af'
+                }}>
+                  <span>ยอดรวมสุทธิ:</span>
+                  <span>{grandTotal.toLocaleString()} บาท</span>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div style={{ 
+                marginTop: 40,
+                paddingTop: 16,
+                borderTop: '1px solid #e5e7eb',
+                fontSize: 12,
+                color: '#666',
+                textAlign: 'center'
+              }}>
+                <p style={{ margin: '0 0 8px 0' }}>ขอบคุณที่ใช้บริการ</p>
+                <p style={{ margin: 0, fontSize: 11 }}>
+                  เอกสารนี้เป็นใบเสนอราคา มีอายุ 30 วันนับจากวันออกเอกสาร
+                </p>
+              </div>
+
+            </div>
+          </div>
 
         </div>
 
       </div>
+
+      {/* Print Styles */}
+      <style>{`
+        @media print {
+          @page {
+            size: A4;
+            margin: 15mm;
+          }
+          
+          body * {
+            visibility: hidden;
+          }
+          
+          .quotation-preview,
+          .quotation-preview * {
+            visibility: visible;
+          }
+          
+          .quotation-preview {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            box-shadow: none !important;
+            padding: 0 !important;
+          }
+          
+          button,
+          .page-header,
+          .card:not(.quotation-preview *),
+          .btn {
+            display: none !important;
+          }
+        }
+      `}</style>
     </div>
   )
 }

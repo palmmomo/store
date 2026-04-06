@@ -54,6 +54,8 @@ export const stockApi = {
   delete: (id: number) => api.delete(`/stock/items/${id}`),
   purchase: (data: { material_id: number; supplier_id: number; quantity: number; total_price: number; receipt_no?: string }) =>
     api.post('/stock/purchase', data),
+  simplePurchase: (data: { item_name: string; quantity: number; unit: string; price: number; store_name?: string }) =>
+    api.post('/stock/simple-purchase', data),
   deduct: (data: { material_id: number; quantity: number; job_id?: number; notes?: string }) =>
     api.post('/stock/deduct', data),
   compare: (materialId: number) => api.get(`/stock/compare/${materialId}`),
@@ -100,6 +102,8 @@ export const orderApi = {
   getAll: (branchId?: string) => api.get('/orders', { params: branchId ? { branch_id: branchId } : {} }),
   getById: (id: string) => api.get(`/orders/${id}`),
   create: (data: any) => api.post('/orders', data),
+  update: (id: string, data: any) => api.put(`/orders/${id}`, data),
+  delete: (id: string) => api.delete(`/orders/${id}`),
 }
 
 export const productApi = {

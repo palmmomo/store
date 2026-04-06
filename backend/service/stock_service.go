@@ -16,6 +16,7 @@ type StockService interface {
 	UpdateMaterial(branchID string, id uint, req UpdateMaterialDTO) (*models.Material, error)
 	DeleteMaterial(branchID string, id uint) error
 	PurchaseMaterial(branchID string, req PurchaseRequestDTO) error
+	SimplePurchaseMaterial(branchID string, req SimplePurchaseRequestDTO) error
 	DeductMaterial(branchID string, req UsageRequestDTO) error
 	GetPriceComparison(materialID uint) ([]models.SupplierComparison, error)
 	GetAllPurchases(branchID string) ([]map[string]interface{}, error)
@@ -233,4 +234,61 @@ func (s *stockService) GetPriceComparison(materialID uint) ([]models.SupplierCom
 
 func (s *stockService) GetAllPurchases(branchID string) ([]map[string]interface{}, error) {
 	return s.repo.GetAllPurchases(branchID)
+}
+
+// SimplePurchaseMaterial creates or updates material by name (free text entry)
+func (s *stockService) SimplePurchaseMaterial(branchID string, req SimplePurchaseRequestDTO) error {
+	// 1. Try to find existing material by name in this branch
+	materials, err := s.repo.FindAllMaterials(branchID)
+	if err != nil {
+		return err
+	}
+	
+	var material *models.Material
+	for _, m := range materials {
+		if m.Name == req.ItemName {
+			material = &m
+			break
+		}
+	}
+	
+	// 2. If not exists, create new material
+	if material == nil {
+		newMaterial := &models.Material{
+			BranchID:      branchID,
+			Name:          req.ItemName,
+			Unit:          req.Unit,
+			CurrentStock:  req.Quantity,
+			MinStockLevel: 0,
+			CategoryID:    1, // Default category
+			CreatedAt:     time.Now(),
+			UpdatedAt:     time.Now(),
+		}
+		err := s.repo.CreateMaterial(newMaterial)
+		if err != nil {
+			return fmt.Errorf("ไม่สามารถสร้างวัสดุใหม่ได้: %v", err)
+		}
+		material = newMaterial
+	} else {
+		// 3. Update existing material stock
+		material.CurrentStock += req.Quantity
+		material.UpdatedAt = time.Now()
+		if err := s.repo.UpdateMaterial(material); err != nil {
+			return fmt.Errorf("ไม่สามารถอัปเดตยอดสต๊อกได้: %v", err)
+		}
+	}
+	
+	// 4. Record purchase transaction
+	purchaseRecord := &models.PurchaseTransaction{
+		BranchID:     branchID,
+		MaterialID:   material.ID,
+		SupplierID:   1, // Default supplier
+		Quantity:     req.Quantity,
+		TotalPrice:   req.Price,
+		UnitCost:     req.Price / req.Quantity,
+		PurchaseDate: time.Now(),
+		ReceiptNo:    req.StoreName,
+	}
+	
+	return s.repo.InsertPurchase(purchaseRecord)
 }

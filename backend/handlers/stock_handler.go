@@ -137,3 +137,18 @@ func (h *StockHandler) GetPurchaseHistory(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"data": res})
 }
+
+// 10. บันทึกการซื้อแบบง่าย (รับชื่อวัสดุเป็นข้อความ)
+func (h *StockHandler) SimplePurchaseStock(c *gin.Context) {
+	var req service.SimplePurchaseRequestDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง: " + err.Error()})
+		return
+	}
+	err := h.srv.SimplePurchaseMaterial(middleware.GetBranchID(c), req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"message": "บันทึกสต๊อกสำเร็จ"})
+}
