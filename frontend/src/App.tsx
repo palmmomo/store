@@ -6,7 +6,6 @@ import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import RecordPage from './pages/RecordPage'
 import StockPage from './pages/StockPage'
-import PurchasesPage from './pages/PurchasesPage'
 import StatsPage from './pages/StatsPage'
 import SummaryPage from './pages/SummaryPage'
 import StaffExpensesPage from './pages/StaffExpensesPage'
@@ -15,6 +14,7 @@ import BranchManagePage from './pages/admin/BranchManagePage'
 import UsersPage from './pages/admin/UsersPage'
 import AdminExpensesView from './pages/admin/AdminExpensesView'
 import SalesHistoryPage from './pages/SalesHistoryPage'
+import PurchaseHistoryPage from './pages/PurchaseHistoryPage'
 
 function ProtectedLayout() {
   const { user, isLoading } = useAuth()
@@ -42,7 +42,7 @@ function ProtectedLayout() {
             <Route path="/record" element={<RecordPage />} />
             <Route path="/expenses" element={<StaffExpensesPage />} />
             <Route path="/stock" element={<StockPage />} />
-            <Route path="/purchases" element={<PurchasesPage />} />
+            <Route path="/purchases" element={<PurchaseHistoryPage />} />
             <Route path="/stats" element={isAdmin ? <StatsPage /> : <Navigate to={defaultPath} />} />
             <Route path="/quotation" element={<QuotationPage />} />
             <Route path="/sales-history" element={<SalesHistoryPage />} />

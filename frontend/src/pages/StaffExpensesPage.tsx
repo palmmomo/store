@@ -1,15 +1,7 @@
-import { useState, useEffect, Component, type ReactNode } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'react-hot-toast'
-import { expensesApi, stockApi } from '../api/client'
-import { Plus, Wallet, ShoppingCart, Send, Pencil, Trash2, X, AlertCircle } from 'lucide-react'
-
-interface Material {
-  id: number
-  name: string
-  category?: { name: string }
-  unit: string
-  current_stock: number
-}
+import { expensesApi } from '../api/client'
+import { Plus, Wallet, Pencil, Trash2, X, Receipt } from 'lucide-react'
 
 interface Expense {
   id: number
@@ -22,68 +14,12 @@ interface Expense {
   user_email?: string
 }
 
-// Error Boundary Component
-class ErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode }, { hasError: boolean; error?: Error }> {
-  constructor(props: { children: ReactNode; fallback?: ReactNode }) {
-    super(props)
-    this.state = { hasError: false }
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error }
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('StaffExpensesPage Error:', error, errorInfo)
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return this.props.fallback || (
-        <div style={{ padding: 20, textAlign: 'center' }}>
-          <AlertCircle size={48} style={{ color: 'var(--danger)', marginBottom: 16 }} />
-          <h3 style={{ color: 'var(--danger)' }}>เกิดข้อผิดพลาดในการแสดงผล</h3>
-          <p style={{ color: 'var(--text-muted)' }}>กรุณารีเฟรชหน้าเพื่อลองใหม่</p>
-          <button className="btn btn-primary" onClick={() => window.location.reload()} style={{ marginTop: 16 }}>
-            รีเฟรชหน้า
-          </button>
-        </div>
-      )
-    }
-    return this.props.children
-  }
-}
-
 export default function StaffExpensesPage() {
-  return (
-    <ErrorBoundary>
-      <StaffExpensesPageContent />
-    </ErrorBoundary>
-  )
-}
-
-function StaffExpensesPageContent() {
-  const [activeTab, setActiveTab] = useState<'expense' | 'purchase'>('expense')
-  const [materials, setMaterials] = useState<Material[]>([])
-  
-  // Expense Form
   const [expenseTitle, setExpenseTitle] = useState('')
   const [expenseAmount, setExpenseAmount] = useState('')
   const [expenseNote, setExpenseNote] = useState('')
-  
-  // Purchase Form
-  const [purchaseItemName, setPurchaseItemName] = useState('')
-  const [purchaseQty, setPurchaseQty] = useState('')
-  const [purchaseUnit, setPurchaseUnit] = useState('')
-  const [purchasePrice, setPurchasePrice] = useState('')
-  const [purchaseStore, setPurchaseStore] = useState('')
-  
-  // History
   const [expenses, setExpenses] = useState<Expense[]>([])
-  
-  // Edit Modal
   const [editExpense, setEditExpense] = useState<Expense | null>(null)
-  
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -103,22 +39,6 @@ function StaffExpensesPageContent() {
   useEffect(() => {
     loadExpenses()
   }, [])
-
-  useEffect(() => {
-    if (activeTab === 'purchase') {
-      loadMaterials()
-    }
-  }, [activeTab])
-
-  const loadMaterials = async () => {
-    try {
-      const res = await stockApi.getAll()
-      setMaterials(res?.data?.data || res?.data || [])
-    } catch (err) {
-      console.error('Load materials error:', err)
-      setMaterials([])
-    }
-  }
 
   const handleSaveExpense = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -173,44 +93,15 @@ function StaffExpensesPageContent() {
     }
   }
 
-  const handleSavePurchase = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!purchaseItemName || !purchaseQty || !purchaseUnit || !purchasePrice) return
-    setSaving(true)
-    try {
-      await stockApi.simplePurchase({
-        item_name: purchaseItemName,
-        quantity: parseFloat(purchaseQty),
-        unit: purchaseUnit,
-        price: parseFloat(purchasePrice),
-        store_name: purchaseStore
-      })
-      toast.success('บันทึกสั่งซื้อวัสดุสำเร็จ!')
-      setPurchaseItemName('')
-      setPurchaseQty('')
-      setPurchaseUnit('')
-      setPurchasePrice('')
-      setPurchaseStore('')
-      loadMaterials()
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'เกิดข้อผิดพลาดในการบันทึก')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  // Format date to Buddhist Era correctly
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '-'
     const date = new Date(dateStr)
     const day = date.getDate()
     const month = date.getMonth() + 1
-    const year = date.getFullYear()
-    // Use Buddhist Era (CE + 543)
-    return `${day}/${month}/${year + 543}`
+    const year = date.getFullYear() + 543
+    return `${day}/${month}/${year}`
   }
 
-  // Format amount without negative sign
   const formatAmount = (amount: number) => {
     const num = Math.abs(parseFloat(String(amount)) || 0)
     return num.toLocaleString('th-TH')
@@ -221,125 +112,40 @@ function StaffExpensesPageContent() {
       <div className="page-header" style={{ marginBottom: 16 }}>
         <div>
           <h1 className="page-title">บันทึกรายจ่าย</h1>
-          <p className="page-subtitle">บันทึกค่าใช้จ่ายทั่วไป และการสั่งซื้อของเข้าร้าน</p>
+          <p className="page-subtitle">บันทึกค่าใช้จ่ายทั่วไปของร้าน</p>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        <button 
-          onClick={() => setActiveTab('expense')}
-          style={{ 
-            flex: 1, padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, 
-            background: activeTab === 'expense' ? 'var(--primary)' : 'var(--bg-card)',
-            color: activeTab === 'expense' ? 'white' : 'var(--text)',
-            border: '1px solid', borderColor: activeTab === 'expense' ? 'var(--primary)' : 'var(--border)',
-            borderRadius: 'var(--radius-md)', fontWeight: 600, cursor: 'pointer', transition: '0.2s'
-          }}
-        >
-          <Wallet size={18} /> จ่ายค่าใช้จ่าย
-        </button>
-        <button 
-          onClick={() => setActiveTab('purchase')}
-          style={{ 
-            flex: 1, padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, 
-            background: activeTab === 'purchase' ? 'var(--primary)' : 'var(--bg-card)',
-            color: activeTab === 'purchase' ? 'white' : 'var(--text)',
-            border: '1px solid', borderColor: activeTab === 'purchase' ? 'var(--primary)' : 'var(--border)',
-            borderRadius: 'var(--radius-md)', fontWeight: 600, cursor: 'pointer', transition: '0.2s'
-          }}
-        >
-          <ShoppingCart size={18} /> สั่งซื้อของ
-        </button>
-      </div>
-
       <div className="card">
-        {activeTab === 'expense' ? (
-          <form onSubmit={handleSaveExpense}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, color: 'var(--primary)' }}>
-              <Wallet size={20} />
-              <h2 style={{ fontSize: 16, margin: 0 }}>บันทึกค่าใช้จ่ายทั่วไป</h2>
-            </div>
+        <form onSubmit={handleSaveExpense}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, color: 'var(--primary)' }}>
+            <Wallet size={20} />
+            <h2 style={{ fontSize: 16, margin: 0 }}>บันทึกค่าใช้จ่ายทั่วไป</h2>
+          </div>
 
-            <div className="form-group">
-              <label className="form-label">รายการ / ชื่อค่าใช้จ่าย</label>
-              <input className="form-input" value={expenseTitle} onChange={e => setExpenseTitle(e.target.value)} placeholder="เช่น ค่าไฟ, ค่าน้ำ, ค่าแรงพนักงาน" required autoFocus />
-            </div>
-            <div className="form-group">
-              <label className="form-label">จำนวนเงิน (บาท)</label>
-              <input type="number" min="0" step="0.01" className="form-input" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} placeholder="0.00" required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">หมายเหตุ (ถ้ามี)</label>
-              <input className="form-input" value={expenseNote} onChange={e => setExpenseNote(e.target.value)} placeholder="รายละเอียดเพิ่มเติม" />
-            </div>
+          <div className="form-group">
+            <label className="form-label">รายการ / ชื่อค่าใช้จ่าย</label>
+            <input className="form-input" value={expenseTitle} onChange={e => setExpenseTitle(e.target.value)} placeholder="เช่น ค่าไฟ, ค่าน้ำ, ค่าแรงพนักงาน" required autoFocus />
+          </div>
+          <div className="form-group">
+            <label className="form-label">จำนวนเงิน (บาท)</label>
+            <input type="number" min="0" step="0.01" className="form-input" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} placeholder="0.00" required />
+          </div>
+          <div className="form-group">
+            <label className="form-label">หมายเหตุ (ถ้ามี)</label>
+            <input className="form-input" value={expenseNote} onChange={e => setExpenseNote(e.target.value)} placeholder="รายละเอียดเพิ่มเติม" />
+          </div>
 
-            <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '14px 0', fontSize: 16, marginTop: 12 }} disabled={saving}>
-              <Plus size={20} /> {saving ? 'กำลังบันทึก...' : 'บันทึกจ่ายเงิน'}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleSavePurchase}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, color: 'var(--primary)' }}>
-              <ShoppingCart size={20} />
-              <h2 style={{ fontSize: 16, margin: 0 }}>บันทึกสั่งซื้อวัสดุเข้าร้าน</h2>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">ชื่อวัสดุ</label>
-              <input 
-                className="form-input" 
-                value={purchaseItemName} 
-                onChange={e => setPurchaseItemName(e.target.value)} 
-                placeholder="พิมพ์ชื่อวัสดุ (เช่น ไวนิล, หมึกพิมพ์)"
-                required 
-              />
-            </div>
-            
-            <div style={{ display: 'flex', gap: 12 }}>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label className="form-label">จำนวน</label>
-                <input type="number" min="0" step="0.01" className="form-input" value={purchaseQty} onChange={e => setPurchaseQty(e.target.value)} placeholder="0.00" required />
-              </div>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label className="form-label">หน่วย</label>
-                <input 
-                  className="form-input" 
-                  value={purchaseUnit} 
-                  onChange={e => setPurchaseUnit(e.target.value)} 
-                  placeholder="เช่น ม้วน, แผ่น, ลิตร"
-                  list="unit-suggestions"
-                  required 
-                />
-                <datalist id="unit-suggestions">
-                  <option value="ม้วน" />
-                  <option value="แผ่น" />
-                  <option value="ชิ้น" />
-                  <option value="ลิตร" />
-                  <option value="ชุด" />
-                  <option value="ตร.ม." />
-                </datalist>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">ราคารวม (บาท)</label>
-              <input type="number" min="0" step="0.01" className="form-input" value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)} placeholder="0.00" required />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">ชื่อร้านที่สั่งซื้อ / ใบเสร็จ</label>
-              <input className="form-input" value={purchaseStore} onChange={e => setPurchaseStore(e.target.value)} placeholder="เช่น ร้านอุปกรณ์ไตรภาค, Shopee" />
-            </div>
-
-            <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '14px 0', fontSize: 16, marginTop: 12 }} disabled={saving}>
-              <Send size={20} /> {saving ? 'กำลังบันทึก...' : 'บันทึกสั่งซื้อของ'}
-            </button>
-          </form>
-        )}
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '14px 0', fontSize: 16, marginTop: 12 }} disabled={saving}>
+            <Plus size={20} /> {saving ? 'กำลังบันทึก...' : 'บันทึกจ่ายเงิน'}
+          </button>
+        </form>
       </div>
 
       <div className="card" style={{ marginTop: 24 }}>
-        <h3 style={{ marginBottom: 16, fontSize: 16 }}>ประวัติค่าใช้จ่ายล่าสุด</h3>
+        <h3 style={{ marginBottom: 16, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Receipt size={18} /> ประวัติค่าใช้จ่ายล่าสุด
+        </h3>
         <div className="table-wrapper">
           <table>
             <thead>
@@ -354,13 +160,13 @@ function StaffExpensesPageContent() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', padding: 20 }}>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: 40 }}>
                     <p style={{ color: 'var(--text-muted)' }}>กำลังโหลด...</p>
                   </td>
                 </tr>
               ) : expenses?.length > 0 ? (
-                expenses.map(ex => (
-                  <tr key={ex?.id}>
+                expenses.map((ex, idx) => (
+                  <tr key={ex?.id} style={{ backgroundColor: idx % 2 === 0 ? 'transparent' : 'var(--bg-secondary)' }}>
                     <td style={{ fontSize: 13 }}>{formatDate(ex?.expense_date)}</td>
                     <td style={{ fontWeight: 500 }}>{ex?.title || '-'}</td>
                     <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--danger)' }}>
@@ -375,8 +181,9 @@ function StaffExpensesPageContent() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 20 }}>
-                    ยังไม่มีข้อมูลรายจ่าย
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>
+                    <Receipt size={48} style={{ opacity: 0.3, marginBottom: 12 }} />
+                    <div>ยังไม่มีข้อมูลรายจ่าย</div>
                   </td>
                 </tr>
               )}

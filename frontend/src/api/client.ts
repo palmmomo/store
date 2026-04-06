@@ -60,6 +60,8 @@ export const stockApi = {
     api.post('/stock/deduct', data),
   compare: (materialId: number) => api.get(`/stock/compare/${materialId}`),
   getPurchases: () => api.get('/stock/purchases'),
+  getPurchaseHistory: (branchId?: string) => api.get('/stock/purchase-history', { params: branchId ? { branch_id: branchId } : {} }),
+  getUsageHistory: (branchId?: string) => api.get('/stock/usage-history', { params: branchId ? { branch_id: branchId } : {} }),
 }
 
 // =====================

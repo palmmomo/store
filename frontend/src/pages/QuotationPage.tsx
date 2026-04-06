@@ -467,13 +467,13 @@ export default function QuotationPage() {
               {/* Items Table */}
               {items.length > 0 && (
                 <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ margin: '0 0 12px 0', fontSize: 14, fontWeight: 'bold', color: '#374151' }}>
+                  <h3 style={{ margin: '0 0 12px 0', fontSize: 16, fontWeight: 'bold', color: '#374151' }}>
                     รายการสินค้า
                   </h3>
                   <table style={{ 
                     width: '100%', 
                     borderCollapse: 'collapse', 
-                    fontSize: 12,
+                    fontSize: 14,
                     border: '1px solid #e5e7eb'
                   }}>
                     <thead>
@@ -507,13 +507,13 @@ export default function QuotationPage() {
               {/* Add-ons */}
               {addOns.length > 0 && (
                 <div style={{ marginBottom: 24 }}>
-                  <h3 style={{ margin: '0 0 12px 0', fontSize: 14, fontWeight: 'bold', color: '#374151' }}>
+                  <h3 style={{ margin: '0 0 12px 0', fontSize: 16, fontWeight: 'bold', color: '#374151' }}>
                     ค่าใช้จ่ายเพิ่มเติม
                   </h3>
                   <table style={{ 
                     width: '100%', 
                     borderCollapse: 'collapse', 
-                    fontSize: 12,
+                    fontSize: 14,
                     border: '1px solid #e5e7eb'
                   }}>
                     <thead>
@@ -541,12 +541,12 @@ export default function QuotationPage() {
                 borderRadius: 8,
                 border: '2px solid #2563eb'
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 15 }}>
                   <span>ราคาสินค้ารวม:</span>
                   <span>{itemsTotal.toLocaleString()} บาท</span>
                 </div>
                 {addOnsTotal > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 15 }}>
                     <span>ค่าใช้จ่ายเพิ่มเติม:</span>
                     <span>{addOnsTotal.toLocaleString()} บาท</span>
                   </div>
@@ -557,7 +557,7 @@ export default function QuotationPage() {
                   marginTop: 12,
                   paddingTop: 12,
                   borderTop: '2px solid #2563eb',
-                  fontSize: 18,
+                  fontSize: 22,
                   fontWeight: 'bold',
                   color: '#1e40af'
                 }}>
@@ -571,12 +571,12 @@ export default function QuotationPage() {
                 marginTop: 40,
                 paddingTop: 16,
                 borderTop: '1px solid #e5e7eb',
-                fontSize: 12,
+                fontSize: 14,
                 color: '#666',
                 textAlign: 'center'
               }}>
                 <p style={{ margin: '0 0 8px 0' }}>ขอบคุณที่ใช้บริการ</p>
-                <p style={{ margin: 0, fontSize: 11 }}>
+                <p style={{ margin: 0, fontSize: 13 }}>
                   เอกสารนี้เป็นใบเสนอราคา มีอายุ 30 วันนับจากวันออกเอกสาร
                 </p>
               </div>
@@ -590,6 +590,8 @@ export default function QuotationPage() {
 
       {/* Print Styles */}
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap');
+        
         @media print {
           @page {
             size: A4;
@@ -612,6 +614,7 @@ export default function QuotationPage() {
             width: 100%;
             box-shadow: none !important;
             padding: 0 !important;
+            font-family: 'Sarabun', sans-serif !important;
           }
           
           button,
@@ -620,6 +623,10 @@ export default function QuotationPage() {
           .btn {
             display: none !important;
           }
+        }
+        
+        .quotation-preview {
+          font-family: 'Sarabun', sans-serif !important;
         }
       `}</style>
     </div>

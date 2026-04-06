@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	"store-backend/db"
 	"store-backend/models"
 	"store-backend/repository"
 	"time"
@@ -16,7 +17,7 @@ type StockService interface {
 	UpdateMaterial(branchID string, id uint, req UpdateMaterialDTO) (*models.Material, error)
 	DeleteMaterial(branchID string, id uint) error
 	PurchaseMaterial(branchID string, req PurchaseRequestDTO) error
-	SimplePurchaseMaterial(branchID string, req SimplePurchaseRequestDTO) error
+	SimplePurchaseMaterial(branchID string, userID string, req SimplePurchaseRequestDTO) error
 	DeductMaterial(branchID string, req UsageRequestDTO) error
 	GetPriceComparison(materialID uint) ([]models.SupplierComparison, error)
 	GetAllPurchases(branchID string) ([]map[string]interface{}, error)
@@ -244,8 +245,8 @@ func (s *stockService) GetAllPurchases(branchID string) ([]map[string]interface{
 	return s.repo.GetAllPurchases(branchID)
 }
 
-// SimplePurchaseMaterial creates or updates material by name (free text entry)
-func (s *stockService) SimplePurchaseMaterial(branchID string, req SimplePurchaseRequestDTO) error {
+// SimplePurchaseMaterial creates or updates material by name (free text entry) and records as expense
+func (s *stockService) SimplePurchaseMaterial(branchID string, userID string, req SimplePurchaseRequestDTO) error {
 	// 1. Try to find existing material by name in this branch
 	materials, err := s.repo.FindAllMaterials(branchID)
 	if err != nil {
@@ -298,5 +299,29 @@ func (s *stockService) SimplePurchaseMaterial(branchID string, req SimplePurchas
 		ReceiptNo:    req.StoreName,
 	}
 	
-	return s.repo.InsertPurchase(purchaseRecord)
+	if err := s.repo.InsertPurchase(purchaseRecord); err != nil {
+		return fmt.Errorf("ไม่สามารถบันทึกการซื้อได้: %v", err)
+	}
+	
+	// 5. Record as expense for branch cost calculation
+	storeInfo := req.StoreName
+	if storeInfo == "" {
+		storeInfo = "ไม่ระบุร้าน"
+	}
+	expenseRecord := map[string]interface{}{
+		"branch_id":    branchID,
+		"user_id":      userID,
+		"title":        fmt.Sprintf("ซื้อวัสดุ: %s (%.2f %s) จาก %s", req.ItemName, req.Quantity, req.Unit, storeInfo),
+		"amount":       req.Price,
+		"note":         fmt.Sprintf("สั่งซื้อเข้าสต๊อก: %s %.2f %s", req.ItemName, req.Quantity, req.Unit),
+		"expense_date": time.Now(),
+	}
+	
+	var expenseResult []map[string]interface{}
+	if err := db.Client.Insert("expenses", expenseRecord, &expenseResult); err != nil {
+		// Log error but don't fail the whole transaction
+		fmt.Printf("Warning: could not record expense: %v\n", err)
+	}
+	
+	return nil
 }

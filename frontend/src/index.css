@@ -258,6 +258,33 @@ td {
 }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: var(--bg-hover); }
+tbody tr:nth-child(even) { background-color: var(--bg-secondary); }
+tbody tr:nth-child(even):hover { background-color: var(--bg-hover); }
+
+/* Enhanced Empty State */
+.empty-state-enhanced {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.empty-state-enhanced svg {
+  opacity: 0.4;
+  margin-bottom: 16px;
+}
+.empty-state-enhanced .title {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+}
+.empty-state-enhanced .subtitle {
+  font-size: 13px;
+  opacity: 0.8;
+}
 
 /* Badges */
 .badge {

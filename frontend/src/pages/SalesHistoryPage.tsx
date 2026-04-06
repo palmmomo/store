@@ -277,8 +277,10 @@ export default function SalesHistoryPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={isAdmin ? 6 : 5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>
-                    ไม่พบข้อมูลยอดขาย
+                  <td colSpan={isAdmin ? 6 : 5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 60 }}>
+                    <ShoppingCart size={48} style={{ opacity: 0.3, marginBottom: 16 }} />
+                    <div style={{ fontSize: 16, marginBottom: 8 }}>ยังไม่มีประวัติยอดขาย</div>
+                    <div style={{ fontSize: 13 }}>ข้อมูลจะปรากฏเมื่อมีการบันทึกรายการขาย</div>
                   </td>
                 </tr>
               )}
