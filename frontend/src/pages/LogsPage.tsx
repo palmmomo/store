@@ -21,23 +21,27 @@ export default function LogsPage() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranch, setSelectedBranch] = useState<string>('')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  const load = async () => {
+    setLoading(true)
+    setError(false)
+    try {
+      const [logsRes, branchRes] = await Promise.all([
+        adminApi.getLogs(selectedBranch),
+        branchApi.getAll(),
+      ])
+      setLogs(Array.isArray(logsRes.data) ? logsRes.data : [])
+      setBranches(Array.isArray(branchRes.data) ? branchRes.data : [])
+    } catch (err) {
+      console.error('Failed to load logs', err)
+      setError(true)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true)
-      try {
-        const [logsRes, branchRes] = await Promise.all([
-          adminApi.getLogs(selectedBranch),
-          branchApi.getAll(),
-        ])
-        setLogs(Array.isArray(logsRes.data) ? logsRes.data : [])
-        setBranches(Array.isArray(branchRes.data) ? branchRes.data : [])
-      } catch (err) {
-        console.error('Failed to load logs', err)
-      } finally {
-        setLoading(false)
-      }
-    }
     load()
   }, [selectedBranch])
 
@@ -56,6 +60,11 @@ export default function LogsPage() {
       <div className="card">
         {loading ? (
           <p style={{ color: 'var(--text-muted)' }}>กำลังโหลด...</p>
+        ) : error ? (
+          <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+            <p style={{ color: 'var(--danger)', marginBottom: 16 }}>ไม่สามารถโหลดข้อมูลได้ในขณะนี้</p>
+            <button className="btn btn-primary" onClick={load}>ลองใหม่</button>
+          </div>
         ) : logs.length === 0 ? (
           <p style={{ color: 'var(--text-muted)' }}>ไม่มีข้อมูลกิจกรรม</p>
         ) : (

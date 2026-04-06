@@ -28,14 +28,14 @@ export default function LoginPage() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'var(--bg-secondary)',
+      background: '#f8fafc',
     }}>
       <div style={{
         background: 'white',
-        borderRadius: 'var(--radius-lg)',
-        padding: 40,
-        width: 380,
-        boxShadow: 'var(--shadow-lg)',
+        borderRadius: '8px',
+        padding: '32px 40px',
+        width: '400px',
+        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
       }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <div style={{
@@ -56,11 +56,12 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">อีเมล</label>
+          <div className="form-group" style={{ textAlign: 'center' }}>
+            <label className="form-label" style={{ textAlign: 'center', display: 'block' }}>อีเมล</label>
             <input
               id="login-email"
               className="form-input"
+              style={{ textAlign: 'center' }}
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
@@ -69,11 +70,12 @@ export default function LoginPage() {
               autoFocus
             />
           </div>
-          <div className="form-group">
-            <label className="form-label">รหัสผ่าน</label>
+          <div className="form-group" style={{ textAlign: 'center' }}>
+            <label className="form-label" style={{ textAlign: 'center', display: 'block' }}>รหัสผ่าน</label>
             <input
               id="login-password"
               className="form-input"
+              style={{ textAlign: 'center' }}
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -100,31 +102,12 @@ export default function LoginPage() {
             className="btn btn-primary"
             type="submit"
             disabled={loading}
-            style={{ width: '100%', marginTop: 8, padding: '10px 0', fontSize: 14 }}
+            style={{ width: '100%', marginTop: 8, padding: '10px 0', fontSize: 14, justifyContent: 'center' }}
           >
             {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
           </button>
         </form>
 
-        <div style={{ marginTop: 24, textAlign: 'center', borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-            เข้าใช้งานครั้งแรก? (ยังไม่มี User ในระบบ)
-          </p>
-          <button
-            className="btn btn-secondary"
-            style={{ fontSize: 12, padding: '6px 12px' }}
-            onClick={async () => {
-              try {
-                const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/auth/setup`, { method: 'POST' });
-                const data = await res.json();
-                if (res.ok) alert(data.message);
-                else alert('Error: ' + JSON.stringify(data));
-              } catch(e: any) { alert('Failed: ' + e.message); }
-            }}
-          >
-            สร้างบัญชีแอดมินเริ่มต้น (Setup)
-          </button>
-        </div>
       </div>
     </div>
   )

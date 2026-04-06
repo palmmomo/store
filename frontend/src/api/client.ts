@@ -1,6 +1,9 @@
 import axios from 'axios'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+let API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+if (API_URL.endsWith('/')) {
+  API_URL = API_URL.slice(0, -1)
+}
 
 const api = axios.create({
   baseURL: `${API_URL}/api`,
@@ -44,7 +47,7 @@ export const branchApi = {
 export const stockApi = {
   getAll: (branchId?: string) => api.get('/stock', { params: branchId ? { branch_id: branchId } : {} }),
   getById: (id: number) => api.get(`/stock/items/${id}`),
-  create: (data: { name: string; category_id: number; unit: string; min_stock_level: number }) =>
+  create: (data: { name: string; category_id: number; unit: string; initial_stock: number; min_stock_level: number }) =>
     api.post('/stock/items', data),
   update: (id: number, data: { name?: string; category_id?: number; unit?: string; min_stock_level?: number }) =>
     api.put(`/stock/items/${id}`, data),
@@ -54,6 +57,17 @@ export const stockApi = {
   deduct: (data: { material_id: number; quantity: number; job_id?: number; notes?: string }) =>
     api.post('/stock/deduct', data),
   compare: (materialId: number) => api.get(`/stock/compare/${materialId}`),
+  getPurchases: () => api.get('/stock/purchases'),
+}
+
+// =====================
+// Expenses API
+// =====================
+export const expensesApi = {
+  getAll: () => api.get('/expenses'),
+  create: (data: { title: string; amount: number; note?: string }) => api.post('/expenses', data),
+  update: (id: number, data: { title?: string; amount?: number; note?: string }) => api.put(`/expenses/${id}`, data),
+  delete: (id: number) => api.delete(`/expenses/${id}`),
 }
 
 // =====================

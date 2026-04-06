@@ -15,6 +15,7 @@ type StockRepository interface {
 	InsertPurchase(p *models.PurchaseTransaction) error
 	InsertUsage(u *models.UsageTransaction) error
 	GetPurchasesByMaterial(materialID uint) ([]map[string]interface{}, error)
+	GetAllPurchases(branchID string) ([]map[string]interface{}, error)
 }
 
 type stockRepository struct{}
@@ -65,5 +66,13 @@ func (r *stockRepository) GetPurchasesByMaterial(id uint) ([]map[string]interfac
 	var res []map[string]interface{}
 	// Join กับตาราง suppliers เพื่อเอาชื่อร้าน
 	err := db.Client.Query("purchase_transactions", fmt.Sprintf("material_id=eq.%d&select=*,suppliers(name)", id), &res)
+	return res, err
+}
+
+func (r *stockRepository) GetAllPurchases(branchID string) ([]map[string]interface{}, error) {
+	var res []map[string]interface{}
+	// Join กับ materials เพื่อเอาชื่อวัสดุ และ suppliers เพื่อเอาชื่อร้าน
+	query := fmt.Sprintf("branch_id=eq.%s&select=*,materials(name),suppliers(name)&order=purchase_date.desc", branchID)
+	err := db.Client.Query("purchase_transactions", query, &res)
 	return res, err
 }

@@ -55,6 +55,27 @@ func GetDashboard(c *gin.Context) {
 	var products []map[string]interface{}
 	db.Client.Query("products", "select=id&is_active=eq.true"+branchFilter, &products)
 
+	// Expenses
+	var allExpenses []map[string]interface{}
+	db.Client.Query("expenses", "select=amount,expense_date"+branchFilter, &allExpenses)
+	
+	expensesToday := 0.0
+	totalExpenses := 0.0
+	for _, e := range allExpenses {
+		amt := 0.0
+		if a, ok := e["amount"].(float64); ok {
+			amt = a
+		}
+		totalExpenses += amt
+		if ed, ok := e["expense_date"].(string); ok && len(ed) >= 10 {
+			if ed[:10] == today {
+				expensesToday += amt
+			}
+		}
+	}
+
+	estProfit := totalRevenue - totalExpenses
+
 	// Low stock items
 	var lowStock []map[string]interface{}
 	db.Client.Query("stock", "select=id,quantity,min_level"+branchFilter, &lowStock)
@@ -80,6 +101,8 @@ func GetDashboard(c *gin.Context) {
 		"low_stock_count": lowStockCount,
 		"revenue_today":   revenueToday,
 		"orders_today":    ordersToday,
+		"expenses_today":  expensesToday,
+		"est_profit":      estProfit,
 	})
 }
 

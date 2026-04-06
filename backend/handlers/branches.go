@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+	"crypto/rand"
+	"encoding/hex"
 
 	"store-backend/db"
 	"store-backend/middleware"
@@ -16,6 +18,7 @@ type branchRow struct {
 	Name      string    `json:"name"`
 	Address   string    `json:"address"`
 	Phone     string    `json:"phone"`
+	LogoUrl   string    `json:"logo_url"`
 	IsActive  bool      `json:"is_active"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -42,23 +45,37 @@ func GetBranches(c *gin.Context) {
 	c.JSON(http.StatusOK, branches)
 }
 
+// generateBranchID generates a short unique ID for branches
+func generateBranchID() string {
+	b := make([]byte, 4)
+	rand.Read(b)
+	return "BR-" + hex.EncodeToString(b)
+}
+
 // CreateBranch creates a new branch (superadmin only)
 func CreateBranch(c *gin.Context) {
 	var req struct {
 		Name    string `json:"name" binding:"required"`
 		Address string `json:"address"`
 		Phone   string `json:"phone"`
+		LogoUrl string `json:"logo_url"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	branchID := generateBranchID()
+	now := time.Now()
 	data := map[string]interface{}{
-		"name":      req.Name,
-		"address":   req.Address,
-		"phone":     req.Phone,
-		"is_active": true,
+		"id":         branchID,
+		"name":       req.Name,
+		"address":    req.Address,
+		"phone":      req.Phone,
+		"logo_url":   req.LogoUrl,
+		"is_active":  true,
+		"created_at": now,
+		"updated_at": now,
 	}
 
 	var result []branchRow
@@ -68,7 +85,12 @@ func CreateBranch(c *gin.Context) {
 	}
 
 	if len(result) == 0 {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create branch"})
+		// Return the data we sent since Supabase may not return it
+		c.JSON(http.StatusCreated, gin.H{
+			"id": branchID, "name": req.Name,
+			"address": req.Address, "phone": req.Phone,
+			"logo_url": req.LogoUrl, "is_active": true,
+		})
 		return
 	}
 	c.JSON(http.StatusCreated, result[0])
@@ -81,6 +103,7 @@ func UpdateBranch(c *gin.Context) {
 		Name     string `json:"name"`
 		Address  string `json:"address"`
 		Phone    string `json:"phone"`
+		LogoUrl  string `json:"logo_url"`
 		IsActive *bool  `json:"is_active"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -97,6 +120,9 @@ func UpdateBranch(c *gin.Context) {
 	}
 	if req.Phone != "" {
 		data["phone"] = req.Phone
+	}
+	if req.LogoUrl != "" {
+		data["logo_url"] = req.LogoUrl
 	}
 	if req.IsActive != nil {
 		data["is_active"] = *req.IsActive

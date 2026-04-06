@@ -106,6 +106,7 @@ func InitApp() {
 			stock.DELETE("/items/:id", middleware.RequireRole("superadmin", "branch_admin", "staff"), stockHandler.DeleteStockItem)
 
 			stock.POST("/purchase", middleware.RequireRole("superadmin", "branch_admin", "staff"), stockHandler.PurchaseStock)
+			stock.GET("/purchases", middleware.RequireRole("superadmin", "branch_admin", "staff"), stockHandler.GetPurchaseHistory)
 			stock.POST("/deduct", stockHandler.DeductStock)
 			stock.GET("/compare/:material_id", stockHandler.GetComparison)
 		}
@@ -115,6 +116,14 @@ func InitApp() {
 			orders.GET("", middleware.RequireRole("superadmin", "branch_admin"), handlers.GetOrders)
 			orders.GET("/:id", handlers.GetOrder)
 			orders.POST("", handlers.CreateOrder)
+		}
+
+		expenses := api.Group("/expenses")
+		{
+			expenses.GET("", handlers.GetExpenses)
+			expenses.POST("", handlers.CreateExpense)
+			expenses.PUT("/:id", handlers.UpdateExpense)
+			expenses.DELETE("/:id", handlers.DeleteExpense)
 		}
 
 		stats := api.Group("/stats")

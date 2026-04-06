@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { stockApi } from '../api/client'
+import { stockApi, branchApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import { toast } from 'react-hot-toast'
 import {
@@ -25,12 +25,16 @@ export default function StockPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingItem, setEditingItem] = useState<Material | null>(null)
   const [showAdjust, setShowAdjust] = useState<Material | null>(null)
-  const [form, setForm] = useState({ name: '', category_id: 1, unit: 'ชิ้น', min_stock_level: 0 })
+  const [loadingBranches, setLoadingBranches] = useState(false)
+  const [adminBranchSelect, setAdminBranchSelect] = useState<string>('')
+  const [branches, setBranches] = useState<{id: string, name: string}[]>([])
+  const [form, setForm] = useState({ name: '', category_id: 1, unit: 'ชิ้น', initial_stock: 0, min_stock_level: 0 })
   const [adjustForm, setAdjustForm] = useState({ type: 'add' as 'add' | 'deduct', quantity: 0, reason: '' })
 
   const loadStock = async () => {
     try {
-      const res = await stockApi.getAll(user?.branch_id || undefined)
+      const branchParam = user?.role === 'superadmin' || user?.role === 'admin' ? adminBranchSelect : user?.branch_id
+      const res = await stockApi.getAll(branchParam || undefined)
       const data = res.data?.data || res.data || []
       setItems(Array.isArray(data) ? data : [])
     } catch (err) {
@@ -41,7 +45,16 @@ export default function StockPage() {
     }
   }
 
-  useEffect(() => { loadStock() }, [])
+  useEffect(() => { loadStock() }, [adminBranchSelect])
+
+  useEffect(() => {
+    if (user?.role === 'superadmin' || user?.role === 'admin') {
+      branchApi.getAll().then(res => setBranches(res.data || []))
+    }
+  }, [user])
+
+  // Is Admin Read-Only Mode
+  const isAdmin = user?.role === 'superadmin' || user?.role === 'admin'
 
   const handleCreate = async () => {
     if (!form.name) return
@@ -49,7 +62,7 @@ export default function StockPage() {
       await stockApi.create(form)
       toast.success('เพิ่มวัสดุสำเร็จ')
       setShowForm(false)
-      setForm({ name: '', category_id: 1, unit: 'ชิ้น', min_stock_level: 0 })
+      setForm({ name: '', category_id: 1, unit: 'ชิ้น', initial_stock: 0, min_stock_level: 0 })
       loadStock()
     } catch (err) {
       toast.error('ไม่สามารถเพิ่มวัสดุได้')
@@ -112,13 +125,13 @@ export default function StockPage() {
 
   const openCreate = () => {
     setEditingItem(null)
-    setForm({ name: '', category_id: 1, unit: 'ชิ้น', min_stock_level: 0 })
+    setForm({ name: '', category_id: 1, unit: 'ชิ้น', initial_stock: 0, min_stock_level: 0 })
     setShowForm(true)
   }
 
   const openEdit = (item: Material) => {
     setEditingItem(item)
-    setForm({ name: item.name, category_id: item.category_id, unit: item.unit, min_stock_level: item.min_stock_level })
+    setForm({ name: item.name, category_id: item.category_id, unit: item.unit, initial_stock: 0, min_stock_level: item.min_stock_level })
     setShowForm(true)
   }
 
@@ -130,29 +143,45 @@ export default function StockPage() {
         <div>
           <h1 className="page-title">สต็อกวัสดุ</h1>
           <p className="page-subtitle">
-            {user?.role === 'superadmin' ? 'จัดการสต็อกทุกสาขา' : 'สต็อกของสาขาคุณ'}
+            {isAdmin ? 'จัดการสต็อกทุกสาขา (ดูข้อมูลได้อย่างเดียว)' : 'สต็อกของสาขาคุณ'}
             {' '}— {items.length} รายการ
           </p>
         </div>
-        <button className="btn btn-primary" onClick={openCreate}><Plus size={16} /> เพิ่มวัสดุ</button>
+        {!isAdmin && <button className="btn btn-primary" onClick={openCreate}><Plus size={16} /> เพิ่มวัสดุ</button>}
       </div>
+
+      {isAdmin && (
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ marginRight: 12, fontWeight: 500 }}>เลือกสาขา:</label>
+          <select className="form-input" style={{ width: 250, display: 'inline-block' }} value={adminBranchSelect} onChange={e => setAdminBranchSelect(e.target.value)}>
+            <option value="">-- ดูสต็อกรวมทุกสาขา --</option>
+            {branches.map(b => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div className="table-wrapper">
         <table>
           <thead>
             <tr>
               <th>ชื่อวัสดุ</th>
-              <th>หน่วย</th>
+              {!isAdmin && <th>หน่วย</th>}
+              {isAdmin && <th>หน่วย</th>}
               <th style={{ textAlign: 'right' }}>คงเหลือ</th>
               <th style={{ textAlign: 'right' }}>ขั้นต่ำ</th>
               <th>สถานะ</th>
-              <th style={{ textAlign: 'right' }}>จัดการ</th>
+              {!isAdmin && <th style={{ textAlign: 'right' }}>จัดการ</th>}
             </tr>
           </thead>
           <tbody>
             {items.map(s => (
               <tr key={s.id}>
-                <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{s.name}</td>
+                <td style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                  {s.name}
+                  {isAdmin && s.branch_id && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>สาขา ID: {s.branch_id}</div>}
+                </td>
                 <td>{s.unit}</td>
                 <td style={{ textAlign: 'right', fontWeight: 700, color: s.current_stock <= s.min_stock_level ? 'var(--danger)' : 'var(--text-primary)' }}>
                   {s.current_stock}
@@ -164,18 +193,20 @@ export default function StockPage() {
                     : <span className="badge badge-success">ปกติ</span>
                   }
                 </td>
-                <td style={{ textAlign: 'right' }}>
-                  <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                    <button className="btn-icon" title="เติมสต็อก" onClick={() => { setShowAdjust(s); setAdjustForm({ type: 'add', quantity: 0, reason: '' }) }}>
-                      <ArrowUpRight size={13} />
-                    </button>
-                    <button className="btn-icon" title="เบิกใช้" onClick={() => { setShowAdjust(s); setAdjustForm({ type: 'deduct', quantity: 0, reason: '' }) }}>
-                      <ArrowDownLeft size={13} />
-                    </button>
-                    <button className="btn-icon" title="แก้ไข" onClick={() => openEdit(s)}><Pencil size={13} /></button>
-                    <button className="btn-icon delete" title="ลบ" onClick={() => handleDelete(s.id)}><Trash2 size={13} /></button>
-                  </div>
-                </td>
+                {!isAdmin && (
+                  <td style={{ textAlign: 'right' }}>
+                    <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                      <button className="btn-icon" title="เติมสต็อก" onClick={() => { setShowAdjust(s); setAdjustForm({ type: 'add', quantity: 0, reason: '' }) }}>
+                        <ArrowUpRight size={13} />
+                      </button>
+                      <button className="btn-icon" title="เบิกใช้" onClick={() => { setShowAdjust(s); setAdjustForm({ type: 'deduct', quantity: 0, reason: '' }) }}>
+                        <ArrowDownLeft size={13} />
+                      </button>
+                      <button className="btn-icon" title="แก้ไข" onClick={() => openEdit(s)}><Pencil size={13} /></button>
+                      <button className="btn-icon delete" title="ลบ" onClick={() => handleDelete(s.id)}><Trash2 size={13} /></button>
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
             {items.length === 0 && (
@@ -211,9 +242,15 @@ export default function StockPage() {
                 <option value="ลิตร">ลิตร</option>
               </select>
             </div>
+            {!editingItem && (
+              <div className="form-group">
+                <label className="form-label">จำนวนเริ่มต้น (ที่ซื้อตั้งต้น)</label>
+                <input className="form-input" type="number" min="0" value={form.initial_stock} onChange={e => setForm({ ...form, initial_stock: parseFloat(e.target.value) || 0 })} />
+              </div>
+            )}
             <div className="form-group">
-              <label className="form-label">สต็อกขั้นต่ำ</label>
-              <input className="form-input" type="number" value={form.min_stock_level} onChange={e => setForm({ ...form, min_stock_level: parseFloat(e.target.value) || 0 })} />
+              <label className="form-label">แจ้งเตือนสต็อกต่ำเมื่อน้อยกว่า</label>
+              <input className="form-input" type="number" min="0" value={form.min_stock_level} onChange={e => setForm({ ...form, min_stock_level: parseFloat(e.target.value) || 0 })} />
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowForm(false)}>ยกเลิก</button>
@@ -238,7 +275,7 @@ export default function StockPage() {
             </p>
             <div className="form-group">
               <label className="form-label">จำนวน ({showAdjust.unit})</label>
-              <input className="form-input" type="number" value={adjustForm.quantity || ''} onChange={e => setAdjustForm({ ...adjustForm, quantity: parseFloat(e.target.value) || 0 })} autoFocus />
+              <input className="form-input" type="number" min="0" step="0.5" value={adjustForm.quantity || ''} onChange={e => setAdjustForm({ ...adjustForm, quantity: parseFloat(e.target.value) || 0 })} autoFocus />
             </div>
             {adjustForm.type === 'deduct' && (
               <div className="form-group">

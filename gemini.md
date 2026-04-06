@@ -20,23 +20,22 @@
 | Auth | Supabase Auth (JWT) |
 | Deployment | Vercel (Frontend) |
 
-## สถานะปัจจุบัน (Session สุดท้าย: 2026-03-20)
+## สถานะปัจจุบัน (Session สุดท้าย: 2026-04-06)
 
 ### ✅ เสร็จแล้ว
-- Frontend ทำงานครบทุกหน้า (mock data)
-- Light/White Theme ใช้งานได้
-- `npm run build` ผ่าน (แก้ TypeScript errors ทั้งหมดแล้ว)
-- Push ขึ้น GitHub (`palmmomo/store`) สำเร็จ (branch: `main` + `dev`)
-- สร้าง `vercel.json` สำหรับ SPA routing
+- Frontend เชื่อมต่อกับ Backend จริง (Supabase + Gin)
+- Deploy ขึ้น Vercel ได้ (Frontend + Backend Serverless)
+- ระบบ Login จริงด้วย Supabase Auth
+- `npm run build` ผ่านทุกครั้ง
+- หน้าสต็อกวัสดุ, ประวัติการจัดซื้อ, บันทึกรายการงาน
+- Mobile responsive (hamburger menu + sidebar overlay)
+- สร้างไฟล์ `SUPABASE_SETUP.sql` เพื่อ reference
 
 ### ⏳ ยังต้องทำต่อ
-- [ ] ตั้งค่า Vercel ให้เชื่อมกับ GitHub repo (Root Directory = `frontend`)
-- [ ] เชื่อมต่อ Supabase จริง (สร้างตาราง + ตั้ง ENV)
-- [ ] ระบบ Login จริง (ตอนนี้ bypass ด้วย admin/admin)
-- [ ] เปลี่ยน mock data เป็นเรียก API จริง
-- [ ] เพิ่มหน้า Transaction modal ให้กรอกข้อมูลซื้อ-ขายได้จริง
-- [ ] Product CRUD, Sorting/Filtering
-- [ ] PDF Export / Invoice
+- [ ] ระบบคำนวณราคาตาม ตร.ม. อัตโนมัติ
+- [ ] ระบบบันทึกรูปภาพงาน (Supabase Storage)
+- [ ] ระบบคิวงาน (Job Status tracking)
+- [ ] PDF Export / ใบเสร็จรับเงิน
 
 ## โครงสร้างโปรเจกต์
 
@@ -157,82 +156,28 @@ go run main.go
   - **Output Directory:** `dist`
 - `vercel.json` อยู่ใน `frontend/` จัดการ SPA routing (rewrite ทุก path ไป `index.html`)
 
-## Supabase Setup (ยังไม่ได้ทำ)
+## Supabase Setup
 
-1. สร้างตารางใน Supabase:
+> **ดู `SUPABASE_SETUP.sql`** ในโฟลเดอร์รากของโปรเจกต์สำหรับ SQL script ทั้งหมด
 
-```sql
--- Branches
-create table branches (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  address text,
-  phone text,
-  is_active boolean default true,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
+ตาราง (Tables) ที่ต้องสร้าง:
 
--- Products
-create table products (
-  id uuid primary key default gen_random_uuid(),
-  branch_id uuid references branches(id),
-  name text not null,
-  price decimal(10,2) not null,
-  category text,
-  image_url text,
-  is_active boolean default true,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
+| Table | คำอธิบาย |
+|---|---|
+| `branches` | ข้อมูลสาขา (id = TEXT เช่น BR-abc1234) |
+| `user_profiles` | เชื่อม user กับ auth.users, เก็บ role และ branch_id |
+| `categories` | หมวดหมู่วัสดุ (id = INT auto-increment) |
+| `suppliers` | คู่ค้า/ร้านค้าวัสดุ |
+| `materials` | รายการวัสดุแต่ละสาขา |
+| `purchase_transactions` | ประวัติการซื้อวัสดุ |
+| `usage_transactions` | ประวัติการเบิกวัสดุ |
+| `orders` | บิลงานอิงค์เจ็ท (id = UUID) |
 
--- Stock
-create table stock (
-  id uuid primary key default gen_random_uuid(),
-  product_id uuid references products(id),
-  branch_id uuid references branches(id),
-  quantity int default 0,
-  min_level int default 5,
-  unit text default 'ชิ้น',
-  updated_at timestamptz default now()
-);
-
--- Stock Logs
-create table stock_logs (
-  id uuid primary key default gen_random_uuid(),
-  product_id uuid references products(id),
-  branch_id uuid references branches(id),
-  change int not null,
-  reason text,
-  user_id uuid,
-  created_at timestamptz default now()
-);
-
--- Orders / Transactions
-create table orders (
-  id uuid primary key default gen_random_uuid(),
-  branch_id uuid references branches(id),
-  user_id uuid,
-  total decimal(10,2) default 0,
-  status text default 'completed',
-  note text,
-  created_at timestamptz default now()
-);
-
--- Order Items
-create table order_items (
-  id uuid primary key default gen_random_uuid(),
-  order_id uuid references orders(id),
-  product_id uuid references products(id),
-  quantity int not null,
-  price decimal(10,2) not null
-);
-```
-
-2. ตั้ง Role ใน Supabase Auth Admin — ใส่ `app_metadata`:
+การตั้ง Role ใน Supabase Auth Admin — ใส่ `app_metadata`:
 ```json
 {
-  "role": "superadmin"
+  "role": "superadmin",
+  "branch_id": "BR-xxxxxxxx"
 }
 ```
 
@@ -281,7 +226,18 @@ create table order_items (
 - ปรับปรุง Sidebar ให้รองรับการสลับ User ตามรายการผู้ใช้ที่อัปเดตล่าสุด
 - แก้ปัญหา TypeScript Error เกี่ยวกับ `useEffect` และ `INITIAL_USER`
 
-### 2026-04-05 — Session 6: Inkjet/Signage Shop Pivot
+### 2026-04-06 — Session 7: Bug Fixes, Mobile Responsive & SQL Update
+
+**ปัญหาที่แก้ไข:**
+1. **ปุ่ม Login** — เพิ่ม `justifyContent: center` ให้ปุ่ม "เข้าสู่ระบบ" อยู่กึ่งกลาง
+2. **เพิ่มสาขาไม่ได้** — `branches.go` แก้ไขให้ Generate `id` ในรูปแบบ `BR-xxxxxxxx` (TEXT) เนื่องจาก DB schema ไม่ใช้ UUID auto-generate
+3. **Mobile Responsive** — เพิ่ม hamburger menu + sidebar overlay + breakpoints ครบถ้วน
+4. **501 Error / ส่งข้อมูลไม่ได้** — `orders.go` ถูก Rewrite ให้รองรับ inkjet job data (description, width, height, price) แทน product_id แบบเก่า
+5. **ความกว้าง/ยาวติดลบ** — `RecordPage.tsx` เพิ่ม `min="0"` + `Math.max(0,...)` validation
+6. **เพิ่มวัสดุไม่ได้** — แก้ไข `StockPage.tsx` ให้ส่ง `initial_stock` field ถูกต้อง
+7. **สร้างไฟล์ SQL** — สร้าง `SUPABASE_SETUP.sql` พร้อม seed data
+8. **อัปเดต gemini.md** — อัปเดต Schema Section และ Activity Log
+
 - **ธุรกิจหลัก**: เปลี่ยนจากร้านอาหาร/ร้านไวนิล เป็น **ร้านป้ายอิงค์เจ็ท (Inkjet Signage Shop)**
 - **Mock Data**: อัปเดตรายการซื้อ-ขายและสต็อกเป็นวัสดุงานป้ายทั้งหมด:
   - งานอิงค์เจ็ท (ตร.ม.), ป้ายไวนิล, สติ๊กเกอร์ PVC
