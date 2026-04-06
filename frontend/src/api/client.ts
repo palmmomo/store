@@ -61,6 +61,16 @@ export const stockApi = {
 }
 
 // =====================
+// Expenses API
+// =====================
+export const expensesApi = {
+  getAll: () => api.get('/expenses'),
+  create: (data: { title: string; amount: number; note?: string }) => api.post('/expenses', data),
+  update: (id: number, data: { title?: string; amount?: number; note?: string }) => api.put(`/expenses/${id}`, data),
+  delete: (id: number) => api.delete(`/expenses/${id}`),
+}
+
+// =====================
 // Admin API
 // =====================
 export const adminApi = {

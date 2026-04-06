@@ -7,13 +7,15 @@ import {
 } from 'lucide-react'
 
 const navItems = [
-  { to: '/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard', adminOnly: true },
-  { to: '/record', icon: <ClipboardList size={18} />, label: 'บันทึกรายการ', adminOnly: false },
-  { to: '/stock', icon: <Package size={18} />, label: 'สต็อกวัสดุ', adminOnly: false },
-  { to: '/purchases', icon: <ShoppingCart size={18} />, label: 'ประวัติการจัดซื้อ', adminOnly: false },
-  { to: '/stats', icon: <BarChart3 size={18} />, label: 'สถิติรวม', adminOnly: true },
-  { to: '/summary', icon: <TrendingUp size={18} />, label: 'สรุปรายวัน', adminOnly: true },
-  { to: '/logs', icon: <FileText size={18} />, label: 'บันทึกกิจกรรม', adminOnly: true },
+  { to: '/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard', roles: ['superadmin', 'admin'] },
+  { to: '/record', icon: <ClipboardList size={18} />, label: 'บันทึกยอดขาย', roles: ['staff'] },
+  { to: '/expenses', icon: <FileText size={18} />, label: 'รายจ่าย', roles: ['staff'] },
+  { to: '/stock', icon: <Package size={18} />, label: 'สต็อกวัสดุ', roles: ['superadmin', 'admin', 'staff'] },
+  { to: '/stats', icon: <BarChart3 size={18} />, label: 'สถิติรวม', roles: ['superadmin', 'admin'] },
+  { to: '/summary', icon: <TrendingUp size={18} />, label: 'สรุปรายวัน', roles: ['superadmin', 'admin'] },
+  { to: '/purchases', icon: <ShoppingCart size={18} />, label: 'ประวัติการจัดซื้อ', roles: ['superadmin', 'admin', 'staff'] },
+  { to: '/quotation', icon: <FileText size={18} />, label: 'ใบเสนอราคา', roles: ['superadmin', 'admin', 'staff'] },
+  { to: '/logs', icon: <FileText size={18} />, label: 'บันทึกกิจกรรม', roles: ['superadmin', 'admin'] },
 ]
 const adminItems = [
   { to: '/admin/branches', icon: <Building2 size={18} />, label: 'จัดการสาขา' },
@@ -25,8 +27,7 @@ export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   if (!user) return null
 
-  const isAdmin = user.role === 'superadmin' || user.role === 'branch_admin'
-  const allowedNav = navItems.filter(item => isAdmin || !item.adminOnly)
+  const allowedNav = navItems.filter(item => item.roles.includes(user.role))
 
   const handleNavClick = () => setMobileOpen(false)
 

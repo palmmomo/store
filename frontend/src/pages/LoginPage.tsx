@@ -28,14 +28,14 @@ export default function LoginPage() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'var(--bg-secondary)',
+      background: '#f8fafc',
     }}>
       <div style={{
         background: 'white',
-        borderRadius: 'var(--radius-lg)',
-        padding: 40,
-        width: 380,
-        boxShadow: 'var(--shadow-lg)',
+        borderRadius: '8px',
+        padding: '32px 40px',
+        width: '400px',
+        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
       }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <div style={{
@@ -108,25 +108,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div style={{ marginTop: 24, textAlign: 'center', borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-            เข้าใช้งานครั้งแรก? (ยังไม่มี User ในระบบ)
-          </p>
-          <button
-            className="btn btn-secondary"
-            style={{ fontSize: 12, padding: '6px 12px' }}
-            onClick={async () => {
-              try {
-                const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/auth/setup`, { method: 'POST' });
-                const data = await res.json();
-                if (res.ok) alert(data.message);
-                else alert('Error: ' + JSON.stringify(data));
-              } catch(e: any) { alert('Failed: ' + e.message); }
-            }}
-          >
-            สร้างบัญชีแอดมินเริ่มต้น (Setup)
-          </button>
-        </div>
       </div>
     </div>
   )

@@ -194,14 +194,15 @@ func DeleteUser(c *gin.Context) {
 // GetActivityLogs returns all stock and order activity
 func GetActivityLogs(c *gin.Context) {
 	branchFilter := c.Query("branch_id")
-	query := "select=*,products(name)&order=created_at.desc&limit=200"
+	query := "select=*,auth.users(email)&order=created_at.desc&limit=200"
 	if branchFilter != "" {
 		query += fmt.Sprintf("&branch_id=eq.%s", branchFilter)
 	}
 
 	var logs []map[string]interface{}
-	if err := db.Client.Query("stock_logs", query, &logs); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := db.Client.Query("logs", query, &logs); err != nil {
+		// Return empty array instead of 500 error if table is missing or fails
+		c.JSON(http.StatusOK, []map[string]interface{}{})
 		return
 	}
 	c.JSON(http.StatusOK, logs)

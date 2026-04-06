@@ -18,6 +18,7 @@ type branchRow struct {
 	Name      string    `json:"name"`
 	Address   string    `json:"address"`
 	Phone     string    `json:"phone"`
+	LogoUrl   string    `json:"logo_url"`
 	IsActive  bool      `json:"is_active"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -57,6 +58,7 @@ func CreateBranch(c *gin.Context) {
 		Name    string `json:"name" binding:"required"`
 		Address string `json:"address"`
 		Phone   string `json:"phone"`
+		LogoUrl string `json:"logo_url"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -70,6 +72,7 @@ func CreateBranch(c *gin.Context) {
 		"name":       req.Name,
 		"address":    req.Address,
 		"phone":      req.Phone,
+		"logo_url":   req.LogoUrl,
 		"is_active":  true,
 		"created_at": now,
 		"updated_at": now,
@@ -86,7 +89,7 @@ func CreateBranch(c *gin.Context) {
 		c.JSON(http.StatusCreated, gin.H{
 			"id": branchID, "name": req.Name,
 			"address": req.Address, "phone": req.Phone,
-			"is_active": true,
+			"logo_url": req.LogoUrl, "is_active": true,
 		})
 		return
 	}
@@ -100,6 +103,7 @@ func UpdateBranch(c *gin.Context) {
 		Name     string `json:"name"`
 		Address  string `json:"address"`
 		Phone    string `json:"phone"`
+		LogoUrl  string `json:"logo_url"`
 		IsActive *bool  `json:"is_active"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -116,6 +120,9 @@ func UpdateBranch(c *gin.Context) {
 	}
 	if req.Phone != "" {
 		data["phone"] = req.Phone
+	}
+	if req.LogoUrl != "" {
+		data["logo_url"] = req.LogoUrl
 	}
 	if req.IsActive != nil {
 		data["is_active"] = *req.IsActive

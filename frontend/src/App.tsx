@@ -10,6 +10,8 @@ import PurchasesPage from './pages/PurchasesPage'
 import StatsPage from './pages/StatsPage'
 import SummaryPage from './pages/SummaryPage'
 import LogsPage from './pages/LogsPage'
+import StaffExpensesPage from './pages/StaffExpensesPage'
+import QuotationPage from './pages/QuotationPage'
 import BranchManagePage from './pages/admin/BranchManagePage'
 import UsersPage from './pages/admin/UsersPage'
 
@@ -37,9 +39,11 @@ function ProtectedLayout() {
           <Routes>
             <Route path="/dashboard" element={isAdmin ? <DashboardPage /> : <Navigate to={defaultPath} />} />
             <Route path="/record" element={<RecordPage />} />
+            <Route path="/expenses" element={<StaffExpensesPage />} />
             <Route path="/stock" element={<StockPage />} />
             <Route path="/purchases" element={<PurchasesPage />} />
             <Route path="/stats" element={isAdmin ? <StatsPage /> : <Navigate to={defaultPath} />} />
+            <Route path="/quotation" element={isAdmin ? <QuotationPage /> : <Navigate to={defaultPath} />} />
             <Route path="/summary" element={isAdmin ? <SummaryPage /> : <Navigate to={defaultPath} />} />
             <Route path="/logs" element={isAdmin ? <LogsPage /> : <Navigate to={defaultPath} />} />
             <Route path="/admin/branches" element={user.role === 'superadmin' ? <BranchManagePage /> : <Navigate to={defaultPath} />} />

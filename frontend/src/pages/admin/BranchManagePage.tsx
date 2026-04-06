@@ -8,6 +8,7 @@ interface Branch {
   name: string
   address: string
   phone: string
+  logo_url: string
   created_at: string
 }
 
@@ -15,8 +16,8 @@ export default function BranchManagePage() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
-  const [form, setForm] = useState({ name: '', address: '', phone: '' })
-  const [inlineEdit, setInlineEdit] = useState<Record<string, { name: string; address: string; phone: string } | null>>({})
+  const [form, setForm] = useState({ name: '', address: '', phone: '', logo_url: '' })
+  const [inlineEdit, setInlineEdit] = useState<Record<string, { name: string; address: string; phone: string; logo_url: string } | null>>({})
 
   const load = async () => {
     try {
@@ -37,7 +38,7 @@ export default function BranchManagePage() {
       await branchApi.create(form)
       toast.success('เพิ่มสาขาสำเร็จ')
       setShowModal(false)
-      setForm({ name: '', address: '', phone: '' })
+      setForm({ name: '', address: '', phone: '', logo_url: '' })
       load()
     } catch (err) {
       toast.error('ไม่สามารถเพิ่มสาขาได้')
@@ -58,7 +59,7 @@ export default function BranchManagePage() {
   }
 
   const openEdit = (b: Branch) => {
-    setInlineEdit(prev => ({ ...prev, [b.id]: { name: b.name, address: b.address, phone: b.phone } }))
+    setInlineEdit(prev => ({ ...prev, [b.id]: { name: b.name, address: b.address, phone: b.phone, logo_url: b.logo_url || '' } }))
   }
 
   const cancelEdit = (id: string) => {
@@ -85,7 +86,7 @@ export default function BranchManagePage() {
     <div>
       <div className="page-header">
         <div><h1 className="page-title">จัดการสาขา</h1><p className="page-subtitle">เพิ่ม แก้ไข ลบสาขา</p></div>
-        <button className="btn btn-primary" onClick={() => { setForm({ name: '', address: '', phone: '' }); setShowModal(true) }}>
+        <button className="btn btn-primary" onClick={() => { setForm({ name: '', address: '', phone: '', logo_url: '' }); setShowModal(true) }}>
           <Plus size={16} /> เพิ่มสาขาใหม่
         </button>
       </div>
@@ -104,8 +105,10 @@ export default function BranchManagePage() {
                   </div>
                   <input className="form-input" style={{ marginBottom: 6, fontSize: 12 }} value={ie.address} placeholder="ที่อยู่"
                     onChange={e => setInlineEdit(prev => ({ ...prev, [b.id]: { ...ie, address: e.target.value } }))} />
-                  <input className="form-input" style={{ marginBottom: 10, fontSize: 12 }} value={ie.phone} placeholder="เบอร์โทร"
+                  <input className="form-input" style={{ marginBottom: 6, fontSize: 12 }} value={ie.phone} placeholder="เบอร์โทร"
                     onChange={e => setInlineEdit(prev => ({ ...prev, [b.id]: { ...ie, phone: e.target.value } }))} />
+                  <input className="form-input" style={{ marginBottom: 10, fontSize: 12 }} value={ie.logo_url} placeholder="URL โลโก้สาขา (ไม่บังคับ)"
+                    onChange={e => setInlineEdit(prev => ({ ...prev, [b.id]: { ...ie, logo_url: e.target.value } }))} />
                   <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                     <button className="btn btn-secondary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => cancelEdit(b.id)}><X size={13} /> ยกเลิก</button>
                     <button className="btn btn-primary" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => saveEdit(b.id)}><Check size={13} /> บันทึก</button>
@@ -115,7 +118,9 @@ export default function BranchManagePage() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div style={{ display: 'flex', gap: 12 }}>
-                      <div className="stat-icon blue" style={{ width: 36, height: 36 }}><Building2 size={16} /></div>
+                      <div className="stat-icon blue" style={{ width: 36, height: 36, overflow: 'hidden', padding: b.logo_url ? 0 : undefined }}>
+                        {b.logo_url ? <img src={b.logo_url} alt="logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <Building2 size={16} />}
+                      </div>
                       <div>
                         <div style={{ fontWeight: 700, fontSize: 15 }}>{b.name}</div>
                         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{b.address || '-'}</div>
@@ -154,6 +159,10 @@ export default function BranchManagePage() {
             <div className="form-group">
               <label className="form-label">เบอร์โทรศัพท์</label>
               <input className="form-input" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="02-xxx-xxxx" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">URL โลโก้สาขา (รูปวงกลม)</label>
+              <input className="form-input" value={form.logo_url} onChange={e => setForm({ ...form, logo_url: e.target.value })} placeholder="https://..." />
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowModal(false)}>ยกเลิก</button>

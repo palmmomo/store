@@ -118,6 +118,14 @@ func InitApp() {
 			orders.POST("", handlers.CreateOrder)
 		}
 
+		expenses := api.Group("/expenses")
+		{
+			expenses.GET("", handlers.GetExpenses)
+			expenses.POST("", handlers.CreateExpense)
+			expenses.PUT("/:id", handlers.UpdateExpense)
+			expenses.DELETE("/:id", handlers.DeleteExpense)
+		}
+
 		stats := api.Group("/stats")
 		{
 			stats.GET("/dashboard", middleware.RequireRole("superadmin", "branch_admin"), handlers.GetDashboard)
