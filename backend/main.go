@@ -112,6 +112,7 @@ func initApp() {
 
 			// Transactions
 			stock.POST("/purchase", middleware.RequireRole("superadmin", "branch_admin", "staff"), stockHandler.PurchaseStock)
+			stock.POST("/simple-purchase", middleware.RequireRole("superadmin", "branch_admin", "staff"), stockHandler.SimplePurchaseStock)
 			stock.POST("/deduct", stockHandler.DeductStock)
 			stock.GET("/compare/:material_id", stockHandler.GetComparison)
 		}

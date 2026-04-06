@@ -1,16 +1,30 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'react-hot-toast'
-import api from '../api/client'
-import { Plus, Receipt, Printer, Trash2 } from 'lucide-react'
+import { orderApi } from '../api/client'
+import { useAuth } from '../contexts/AuthContext'
+import { Plus, Receipt, Printer, Trash2, Pencil, X, ShoppingCart, Calendar } from 'lucide-react'
 
 interface JobItem {
+  id?: number
   description: string
   width: number
   height: number
   price: number
+  quantity: number
+}
+
+interface Order {
+  id: string
+  total: number
+  payment: string
+  created_at: string
+  items: JobItem[]
+  user_email?: string
+  branch_id?: string
 }
 
 export default function RecordPage() {
+  const { user } = useAuth()
   const [items, setItems] = useState<JobItem[]>([])
   const [desc, setDesc] = useState('')
   const [width, setWidth] = useState<string>('')
@@ -18,8 +32,30 @@ export default function RecordPage() {
   const [price, setPrice] = useState<string>('')
   const [paymentType, setPaymentType] = useState('โอนเงิน')
   const [saving, setSaving] = useState(false)
+  
+  // History
+  const [orders, setOrders] = useState<Order[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null)
 
   const total = items.reduce((sum, item) => sum + item.price, 0)
+
+  const loadOrders = async () => {
+    try {
+      setLoading(true)
+      const res = await orderApi.getAll(user?.branch_id)
+      setOrders(res?.data || [])
+    } catch (err) {
+      console.error('Load orders error:', err)
+      setOrders([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadOrders()
+  }, [])
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault()
@@ -31,7 +67,7 @@ export default function RecordPage() {
       toast.error('กรุณากรอกราคา')
       return
     }
-    setItems([...items, { description: desc, width: w, height: h, price: p }])
+    setItems([...items, { description: desc, width: w, height: h, price: p, quantity: 1 }])
     setDesc('')
     setWidth('')
     setHeight('')
@@ -49,7 +85,7 @@ export default function RecordPage() {
     }
     setSaving(true)
     try {
-      await api.post('/orders', {
+      await orderApi.create({
         payment: paymentType,
         total,
         items: items.map(i => ({
@@ -62,6 +98,7 @@ export default function RecordPage() {
       })
       toast.success('บันทึกรายการสำเร็จ!')
       setItems([])
+      loadOrders()
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } } }
       const msg = error?.response?.data?.error || 'เกิดข้อผิดพลาด'
@@ -71,13 +108,94 @@ export default function RecordPage() {
     }
   }
 
+  const handleDeleteOrder = async (id: string) => {
+    if (!confirm('ยืนยันที่จะลบรายการนี้?')) return
+    try {
+      await orderApi.delete(id)
+      toast.success('ลบรายการสำเร็จ')
+      loadOrders()
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'ไม่สามารถลบรายการได้')
+    }
+  }
+
+  const handleEditOrder = (order: Order) => {
+    setEditingOrder(order)
+    setItems(order.items.map(i => ({
+      ...i,
+      quantity: i.quantity || 1
+    })))
+    setPaymentType(order.payment)
+  }
+
+  const handleUpdateOrder = async () => {
+    if (!editingOrder || items.length === 0) {
+      toast.error('กรุณาเพิ่มรายการงาน')
+      return
+    }
+    setSaving(true)
+    try {
+      await orderApi.update(editingOrder.id, {
+        payment: paymentType,
+        total,
+        items: items.map(i => ({
+          description: i.description,
+          width: i.width,
+          height: i.height,
+          price: i.price,
+          quantity: 1,
+        }))
+      })
+      toast.success('อัปเดตรายการสำเร็จ!')
+      setItems([])
+      setEditingOrder(null)
+      setPaymentType('โอนเงิน')
+      loadOrders()
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: string } } }
+      const msg = error?.response?.data?.error || 'เกิดข้อผิดพลาด'
+      toast.error(msg)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '-'
+    const date = new Date(dateStr)
+    const day = date.getDate()
+    const month = date.getMonth() + 1
+    const year = date.getFullYear() + 543
+    return `${day}/${month}/${year}`
+  }
+
+  const getItemsDescription = (order: Order) => {
+    if (!order?.items || order.items.length === 0) return '-'
+    if (order.items.length === 1) return order.items[0].description || 'รายการงาน'
+    return `${order.items[0].description || 'รายการงาน'} และอีก ${order.items.length - 1} รายการ`
+  }
+
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <div className="page-header">
         <div>
-          <h1 className="page-title">บันทึกรายการงาน</h1>
-          <p className="page-subtitle">เพิ่มรายการสั่งพิมพ์อิงค์เจ็ท / รับเงิน</p>
+          <h1 className="page-title">
+            <ShoppingCart size={24} style={{ verticalAlign: 'middle', marginRight: 8 }} />
+            {editingOrder ? 'แก้ไขรายการงาน' : 'บันทึกรายการงาน'}
+          </h1>
+          <p className="page-subtitle">
+            {editingOrder ? `แก้ไขรายการ #${editingOrder.id.slice(0, 8)}` : 'เพิ่มรายการสั่งพิมพ์อิงค์เจ็ท / รับเงิน'}
+          </p>
         </div>
+        {editingOrder && (
+          <button className="btn btn-secondary" onClick={() => {
+            setEditingOrder(null)
+            setItems([])
+            setPaymentType('โอนเงิน')
+          }}>
+            <X size={16} /> ยกเลิกการแก้ไข
+          </button>
+        )}
       </div>
 
       <div className="record-layout">
@@ -107,7 +225,7 @@ export default function RecordPage() {
             </div>
 
             <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-              <Plus size={16} /> หยิบใส่บิล
+              <Plus size={16} /> เพิ่มรายการ
             </button>
           </form>
         </div>
@@ -116,7 +234,7 @@ export default function RecordPage() {
         <div className="card" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, borderBottom: '1px dashed var(--border)', paddingBottom: 12 }}>
             <Receipt size={20} color="var(--primary)" />
-            <h3 style={{ fontSize: 16, margin: 0 }}>บิลรายการ</h3>
+            <h3 style={{ fontSize: 16, margin: 0 }}>{editingOrder ? 'รายการที่แก้ไข' : 'บิลรายการ'}</h3>
           </div>
 
           <div style={{ minHeight: 120 }}>
@@ -161,14 +279,73 @@ export default function RecordPage() {
             <button 
               className="btn btn-primary" 
               style={{ width: '100%', justifyContent: 'center', padding: '11px 0', fontSize: 14 }}
-              onClick={handleSave}
+              onClick={editingOrder ? handleUpdateOrder : handleSave}
               disabled={items.length === 0 || saving}
             >
-              <Printer size={16} /> {saving ? 'กำลังบันทึก...' : 'บันทึกและพิมพ์บิล'}
+              <Printer size={16} /> {saving ? 'กำลังบันทึก...' : editingOrder ? 'บันทึกการแก้ไข' : 'บันทึกและพิมพ์บิล'}
             </button>
           </div>
         </div>
 
+      </div>
+
+      {/* Sales History */}
+      <div className="card" style={{ marginTop: 24 }}>
+        <h3 style={{ marginBottom: 16, fontSize: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Calendar size={18} />
+          ประวัติรายการขาย
+        </h3>
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>วันที่</th>
+                <th>รายการ</th>
+                <th>ช่องทาง</th>
+                <th style={{ textAlign: 'right' }}>ยอดขาย</th>
+                <th style={{ textAlign: 'right' }}>จัดการ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: 40 }}>
+                    <p style={{ color: 'var(--text-muted)' }}>กำลังโหลด...</p>
+                  </td>
+                </tr>
+              ) : orders?.length > 0 ? (
+                orders.slice(0, 10).map(order => (
+                  <tr key={order?.id}>
+                    <td style={{ fontSize: 13 }}>{formatDate(order?.created_at)}</td>
+                    <td style={{ fontWeight: 500 }}>{getItemsDescription(order)}</td>
+                    <td>
+                      <span className={`badge badge-${order?.payment === 'เงินสด' ? 'success' : 'info'}`} style={{ fontSize: 12 }}>
+                        {order?.payment || '-'}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--success)' }}>
+                      {order?.total?.toLocaleString('th-TH')} บาท
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button className="btn-icon" onClick={() => handleEditOrder(order)} title="แก้ไข">
+                        <Pencil size={14} />
+                      </button>
+                      <button className="btn-icon delete" onClick={() => handleDeleteOrder(order?.id)} title="ลบ">
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>
+                    ยังไม่มีประวัติรายการขาย
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )

@@ -1,23 +1,68 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Component, type ReactNode } from 'react'
 import { toast } from 'react-hot-toast'
 import { expensesApi, stockApi } from '../api/client'
-import { Plus, Wallet, ShoppingCart, Send, Pencil, Trash2, X } from 'lucide-react'
+import { Plus, Wallet, ShoppingCart, Send, Pencil, Trash2, X, AlertCircle } from 'lucide-react'
 
 interface Material {
   id: number
   name: string
-  category: { name: string }
+  category?: { name: string }
   unit: string
   current_stock: number
-}interface Expense {
+}
+
+interface Expense {
   id: number
   title: string
   amount: number
   note: string
   expense_date: string
+  branch_id?: string
+  branches?: { name: string }
+  user_email?: string
+}
+
+// Error Boundary Component
+class ErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode }, { hasError: boolean; error?: Error }> {
+  constructor(props: { children: ReactNode; fallback?: ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('StaffExpensesPage Error:', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || (
+        <div style={{ padding: 20, textAlign: 'center' }}>
+          <AlertCircle size={48} style={{ color: 'var(--danger)', marginBottom: 16 }} />
+          <h3 style={{ color: 'var(--danger)' }}>เกิดข้อผิดพลาดในการแสดงผล</h3>
+          <p style={{ color: 'var(--text-muted)' }}>กรุณารีเฟรชหน้าเพื่อลองใหม่</p>
+          <button className="btn btn-primary" onClick={() => window.location.reload()} style={{ marginTop: 16 }}>
+            รีเฟรชหน้า
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
 }
 
 export default function StaffExpensesPage() {
+  return (
+    <ErrorBoundary>
+      <StaffExpensesPageContent />
+    </ErrorBoundary>
+  )
+}
+
+function StaffExpensesPageContent() {
   const [activeTab, setActiveTab] = useState<'expense' | 'purchase'>('expense')
   const [materials, setMaterials] = useState<Material[]>([])
   
@@ -27,8 +72,9 @@ export default function StaffExpensesPage() {
   const [expenseNote, setExpenseNote] = useState('')
   
   // Purchase Form
-  const [purchaseMaterialId, setPurchaseMaterialId] = useState('')
+  const [purchaseItemName, setPurchaseItemName] = useState('')
   const [purchaseQty, setPurchaseQty] = useState('')
+  const [purchaseUnit, setPurchaseUnit] = useState('')
   const [purchasePrice, setPurchasePrice] = useState('')
   const [purchaseStore, setPurchaseStore] = useState('')
   
@@ -39,13 +85,18 @@ export default function StaffExpensesPage() {
   const [editExpense, setEditExpense] = useState<Expense | null>(null)
   
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   const loadExpenses = async () => {
     try {
+      setLoading(true)
       const res = await expensesApi.getAll()
-      setExpenses(res.data || [])
+      setExpenses(res?.data || [])
     } catch (err) {
-      console.error(err)
+      console.error('Load expenses error:', err)
+      setExpenses([])
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -62,9 +113,10 @@ export default function StaffExpensesPage() {
   const loadMaterials = async () => {
     try {
       const res = await stockApi.getAll()
-      setMaterials(res.data.data || [])
+      setMaterials(res?.data?.data || res?.data || [])
     } catch (err) {
-      console.error(err)
+      console.error('Load materials error:', err)
+      setMaterials([])
     }
   }
 
@@ -84,7 +136,7 @@ export default function StaffExpensesPage() {
       setExpenseNote('')
       loadExpenses()
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'เกิดข้อผิดพลาดในการบันทึก')
+      toast.error(err?.response?.data?.error || 'เกิดข้อผิดพลาดในการบันทึก')
     } finally {
       setSaving(false)
     }
@@ -97,14 +149,14 @@ export default function StaffExpensesPage() {
     try {
       await expensesApi.update(editExpense.id, {
         title: editExpense.title,
-        amount: parseFloat(editExpense.amount.toString()),
+        amount: parseFloat(String(editExpense.amount)),
         note: editExpense.note
       })
       toast.success('อัปเดตค่าใช้จ่ายสำเร็จ!')
       setEditExpense(null)
       loadExpenses()
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'เกิดข้อผิดพลาดในการอัปเดต')
+      toast.error(err?.response?.data?.error || 'เกิดข้อผิดพลาดในการอัปเดต')
     } finally {
       setSaving(false)
     }
@@ -117,34 +169,51 @@ export default function StaffExpensesPage() {
       toast.success('ลบค่าใช้จ่ายสำเร็จ')
       loadExpenses()
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'ไม่สามารถลบได้')
+      toast.error(err?.response?.data?.error || 'ไม่สามารถลบได้')
     }
   }
 
   const handleSavePurchase = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!purchaseMaterialId || !purchaseQty || !purchasePrice) return
+    if (!purchaseItemName || !purchaseQty || !purchaseUnit || !purchasePrice) return
     setSaving(true)
     try {
-      // Assuming supplier_id = 1 is the default "General Store"
-      await stockApi.purchase({
-        material_id: parseInt(purchaseMaterialId),
-        supplier_id: 1, 
+      await stockApi.simplePurchase({
+        item_name: purchaseItemName,
         quantity: parseFloat(purchaseQty),
-        total_price: parseFloat(purchasePrice),
-        receipt_no: purchaseStore // Store name placed in receipt_no for now
+        unit: purchaseUnit,
+        price: parseFloat(purchasePrice),
+        store_name: purchaseStore
       })
       toast.success('บันทึกสั่งซื้อวัสดุสำเร็จ!')
-      setPurchaseMaterialId('')
+      setPurchaseItemName('')
       setPurchaseQty('')
+      setPurchaseUnit('')
       setPurchasePrice('')
       setPurchaseStore('')
-      loadMaterials() // refresh stock
+      loadMaterials()
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'เกิดข้อผิดพลาดในการบันทึก')
+      toast.error(err?.response?.data?.error || 'เกิดข้อผิดพลาดในการบันทึก')
     } finally {
       setSaving(false)
     }
+  }
+
+  // Format date to Buddhist Era correctly
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '-'
+    const date = new Date(dateStr)
+    const day = date.getDate()
+    const month = date.getMonth() + 1
+    const year = date.getFullYear()
+    // Use Buddhist Era (CE + 543)
+    return `${day}/${month}/${year + 543}`
+  }
+
+  // Format amount without negative sign
+  const formatAmount = (amount: number) => {
+    const num = Math.abs(parseFloat(String(amount)) || 0)
+    return num.toLocaleString('th-TH')
   }
 
   return (
@@ -216,29 +285,50 @@ export default function StaffExpensesPage() {
             </div>
 
             <div className="form-group">
-              <label className="form-label">เลือกวัสดุ</label>
-              <select className="form-input" value={purchaseMaterialId} onChange={e => setPurchaseMaterialId(e.target.value)} required>
-                <option value="">-- เลือกวัสดุที่มีในสต็อก --</option>
-                {materials.map(m => (
-                  <option key={m.id} value={m.id}>{m.name} ({m.category.name}) - เหลือ {m.current_stock} {m.unit}</option>
-                ))}
-              </select>
+              <label className="form-label">ชื่อวัสดุ</label>
+              <input 
+                className="form-input" 
+                value={purchaseItemName} 
+                onChange={e => setPurchaseItemName(e.target.value)} 
+                placeholder="พิมพ์ชื่อวัสดุ (เช่น ไวนิล, หมึกพิมพ์)"
+                required 
+              />
             </div>
             
             <div style={{ display: 'flex', gap: 12 }}>
               <div className="form-group" style={{ flex: 1 }}>
-                <label className="form-label">จำนวนที่ซื้อ</label>
-                <input type="number" min="0" step="0.01" className="form-input" value={purchaseQty} onChange={e => setPurchaseQty(e.target.value)} placeholder="ใส่จำนวนเลข" required />
+                <label className="form-label">จำนวน</label>
+                <input type="number" min="0" step="0.01" className="form-input" value={purchaseQty} onChange={e => setPurchaseQty(e.target.value)} placeholder="0.00" required />
               </div>
               <div className="form-group" style={{ flex: 1 }}>
-                <label className="form-label">ราคารวม (บาท)</label>
-                <input type="number" min="0" step="0.01" className="form-input" value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)} placeholder="0.00" required />
+                <label className="form-label">หน่วย</label>
+                <input 
+                  className="form-input" 
+                  value={purchaseUnit} 
+                  onChange={e => setPurchaseUnit(e.target.value)} 
+                  placeholder="เช่น ม้วน, แผ่น, ลิตร"
+                  list="unit-suggestions"
+                  required 
+                />
+                <datalist id="unit-suggestions">
+                  <option value="ม้วน" />
+                  <option value="แผ่น" />
+                  <option value="ชิ้น" />
+                  <option value="ลิตร" />
+                  <option value="ชุด" />
+                  <option value="ตร.ม." />
+                </datalist>
               </div>
             </div>
 
             <div className="form-group">
+              <label className="form-label">ราคารวม (บาท)</label>
+              <input type="number" min="0" step="0.01" className="form-input" value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)} placeholder="0.00" required />
+            </div>
+
+            <div className="form-group">
               <label className="form-label">ชื่อร้านที่สั่งซื้อ / ใบเสร็จ</label>
-              <input className="form-input" value={purchaseStore} onChange={e => setPurchaseStore(e.target.value)} placeholder="เช่น ร้านอุปกรณ์ไตรภาค, Shopee" required />
+              <input className="form-input" value={purchaseStore} onChange={e => setPurchaseStore(e.target.value)} placeholder="เช่น ร้านอุปกรณ์ไตรภาค, Shopee" />
             </div>
 
             <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '14px 0', fontSize: 16, marginTop: 12 }} disabled={saving}>
@@ -262,22 +352,33 @@ export default function StaffExpensesPage() {
               </tr>
             </thead>
             <tbody>
-              {expenses.map(ex => (
-                <tr key={ex.id}>
-                  <td style={{ fontSize: 13 }}>{new Date(ex.expense_date).toLocaleDateString('th-TH')}</td>
-                  <td style={{ fontWeight: 500 }}>{ex.title}</td>
-                  <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--danger)' }}>
-                    -฿{ex.amount.toLocaleString()}
-                  </td>
-                  <td style={{ fontSize: 13, color: 'var(--text-muted)' }}>{ex.note || '-'}</td>
-                  <td style={{ textAlign: 'right' }}>
-                    <button className="btn-icon" onClick={() => setEditExpense(ex)} title="แก้ไข"><Pencil size={14} /></button>
-                    <button className="btn-icon delete" onClick={() => handleDeleteExpense(ex.id)} title="ลบ"><Trash2 size={14} /></button>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: 20 }}>
+                    <p style={{ color: 'var(--text-muted)' }}>กำลังโหลด...</p>
                   </td>
                 </tr>
-              ))}
-              {expenses.length === 0 && (
-                <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>ยังไม่มีข้อมูลรายจ่าย</td></tr>
+              ) : expenses?.length > 0 ? (
+                expenses.map(ex => (
+                  <tr key={ex?.id}>
+                    <td style={{ fontSize: 13 }}>{formatDate(ex?.expense_date)}</td>
+                    <td style={{ fontWeight: 500 }}>{ex?.title || '-'}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--danger)' }}>
+                      ฿{formatAmount(ex?.amount)} บาท
+                    </td>
+                    <td style={{ fontSize: 13, color: 'var(--text-muted)' }}>{ex?.note || '-'}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button className="btn-icon" onClick={() => setEditExpense(ex)} title="แก้ไข"><Pencil size={14} /></button>
+                      <button className="btn-icon delete" onClick={() => handleDeleteExpense(ex?.id)} title="ลบ"><Trash2 size={14} /></button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 20 }}>
+                    ยังไม่มีข้อมูลรายจ่าย
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>

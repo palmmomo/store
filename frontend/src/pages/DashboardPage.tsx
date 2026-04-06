@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { branchApi, statsApi } from '../api/client'
+import { branchApi, statsApi, stockApi, orderApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import {
-  ArrowUpRight, ArrowDownLeft, DollarSign, Calendar, AlertTriangle,
+  ArrowUpRight, ArrowDownLeft, DollarSign, Calendar, AlertTriangle, CheckCircle2
 } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -26,25 +26,66 @@ interface Branch {
   phone: string
 }
 
+interface BranchSummary {
+  id: string
+  name: string
+  todaySales: number
+  criticalStock: number
+}
+
 export default function DashboardPage() {
   const { user } = useAuth()
   const [stats, setStats] = useState<DashboardData | null>(null)
   const [branches, setBranches] = useState<Branch[]>([])
   const [chartData, setChartData] = useState<any[]>([])
+  const [branchSummaries, setBranchSummaries] = useState<BranchSummary[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [statsRes, branchRes, chartRes] = await Promise.all([
+        const [statsRes, branchRes, chartRes, stockRes, ordersRes] = await Promise.all([
           statsApi.getDashboard(),
           branchApi.getAll(),
-          statsApi.getChart('')
+          statsApi.getChart(''),
+          stockApi.getAll(),
+          orderApi.getAll()
         ])
         setStats(statsRes.data)
-        setBranches(Array.isArray(branchRes.data) ? branchRes.data : [])
+        const branchesData = Array.isArray(branchRes.data) ? branchRes.data : []
+        setBranches(branchesData)
+        
+        // Calculate branch summaries
+        const today = new Date().toISOString().split('T')[0]
+        const stocks = stockRes?.data?.data || stockRes?.data || []
+        const orders = ordersRes?.data || []
+        
+        const summaries: BranchSummary[] = branchesData.map((branch: any) => {
+          // Calculate today's sales for this branch
+          const todayOrders = orders.filter((o: any) => {
+            const orderDate = new Date(o?.created_at || '').toISOString().split('T')[0]
+            return o?.branch_id === branch.id && orderDate === today
+          })
+          const todaySales = todayOrders.reduce((sum: number, o: any) => sum + (o?.total || 0), 0)
+          
+          // Calculate critical stock for this branch
+          const branchStocks = stocks.filter((s: any) => s?.branch_id === branch.id)
+          const criticalStock = branchStocks.filter((s: any) => {
+            const minLevel = s?.min_stock_level || s?.MinStockLevel || 0
+            return minLevel > 0 && (s?.current_stock || s?.CurrentStock || 0) <= minLevel
+          }).length
+          
+          return {
+            id: branch.id,
+            name: branch.name,
+            todaySales,
+            criticalStock
+          }
+        })
+        
+        setBranchSummaries(summaries)
+        
         const fullChart = Array.isArray(chartRes.data) ? chartRes.data : []
-        // get last 7 days only
         setChartData(fullChart.slice(-7))
       } catch (err) {
         console.error('Dashboard load error:', err)
@@ -125,14 +166,34 @@ export default function DashboardPage() {
           <table style={{ margin: 0 }}>
             <thead><tr><th>สาขา</th><th style={{textAlign: 'right'}}>ยอดวันนี้</th><th style={{textAlign: 'center'}}>สต๊อกวิกฤต</th></tr></thead>
             <tbody>
-              {branches.map(b => (
+              {branchSummaries.map(b => (
                 <tr key={b.id}>
                   <td style={{ fontWeight: 600 }}>{b.name}</td>
-                  <td style={{ textAlign: 'right', color: 'var(--text-muted)' }}>-</td>
-                  <td style={{ textAlign: 'center', color: 'var(--text-muted)' }}>-</td>
+                  <td style={{ textAlign: 'right', fontWeight: 500 }}>
+                    {b.todaySales > 0 ? fmt(b.todaySales) : '฿0'}
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    {b.criticalStock > 0 ? (
+                      <span style={{ color: 'var(--danger)', fontWeight: 500 }}>
+                        <AlertTriangle size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                        {b.criticalStock} รายการ
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--success)' }}>
+                        <CheckCircle2 size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                        ปกติ
+                      </span>
+                    )}
+                  </td>
                 </tr>
               ))}
-              {branches.length === 0 && <tr><td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>ยังไม่มีข้อมูลสาขา</td></tr>}
+              {branchSummaries.length === 0 && (
+                <tr>
+                  <td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                    ยังไม่มีข้อมูลสาขา
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
