@@ -54,6 +54,14 @@ type PurchaseRequestDTO struct {
 	ReceiptNo  string  `json:"receipt_no"`
 }
 
+type SimplePurchaseRequestDTO struct {
+	ItemName  string  `json:"item_name" binding:"required"`
+	Unit      string  `json:"unit" binding:"required"`
+	Quantity  float64 `json:"quantity" binding:"required,gt=0"`
+	Price     float64 `json:"price" binding:"required,gt=0"`
+	StoreName string  `json:"store_name"`
+}
+
 type UsageRequestDTO struct {
 	MaterialID uint    `json:"material_id" binding:"required"`
 	JobID      *uint   `json:"job_id"`
