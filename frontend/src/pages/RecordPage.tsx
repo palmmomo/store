@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { toast } from 'react-hot-toast'
 import { orderApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
-import { Plus, Receipt, Printer, Trash2, Pencil, X, ShoppingCart, Calendar } from 'lucide-react'
+import { Plus, Receipt, Trash2, Pencil, X, ShoppingCart, Calendar } from 'lucide-react'
 
 interface JobItem {
   id?: number
@@ -17,9 +17,8 @@ interface Order {
   id: string
   total: number
   payment: string
+  note?: string
   created_at: string
-  items: JobItem[]
-  user_email?: string
   branch_id?: string
 }
 
@@ -27,12 +26,10 @@ export default function RecordPage() {
   const { user } = useAuth()
   const [items, setItems] = useState<JobItem[]>([])
   const [desc, setDesc] = useState('')
-  const [width, setWidth] = useState<string>('')
-  const [height, setHeight] = useState<string>('')
   const [price, setPrice] = useState<string>('')
   const [paymentType, setPaymentType] = useState('โอนเงิน')
   const [saving, setSaving] = useState(false)
-  
+
   // History
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
@@ -44,7 +41,12 @@ export default function RecordPage() {
     try {
       setLoading(true)
       const res = await orderApi.getAll(user?.branch_id)
-      setOrders(res?.data || [])
+      const data = res?.data || []
+      // Sort by created_at desc
+      const sorted = Array.isArray(data)
+        ? [...data].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        : []
+      setOrders(sorted)
     } catch (err) {
       console.error('Load orders error:', err)
       setOrders([])
@@ -60,17 +62,13 @@ export default function RecordPage() {
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault()
     if (!desc || !price) return
-    const w = Math.max(0, parseFloat(width) || 0)
-    const h = Math.max(0, parseFloat(height) || 0)
     const p = Math.max(0, parseFloat(price) || 0)
     if (p <= 0) {
       toast.error('กรุณากรอกราคา')
       return
     }
-    setItems([...items, { description: desc, width: w, height: h, price: p, quantity: 1 }])
+    setItems([...items, { description: desc, width: 0, height: 0, price: p, quantity: 1 }])
     setDesc('')
-    setWidth('')
-    setHeight('')
     setPrice('')
   }
 
@@ -90,19 +88,19 @@ export default function RecordPage() {
         total,
         items: items.map(i => ({
           description: i.description,
-          width: i.width,
-          height: i.height,
+          width: 0,
+          height: 0,
           price: i.price,
           quantity: 1,
         }))
       })
       toast.success('บันทึกรายการสำเร็จ!')
       setItems([])
+      setPaymentType('โอนเงิน')
       loadOrders()
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } } }
-      const msg = error?.response?.data?.error || 'เกิดข้อผิดพลาด'
-      toast.error(msg)
+      toast.error(error?.response?.data?.error || 'เกิดข้อผิดพลาด')
     } finally {
       setSaving(false)
     }
@@ -121,11 +119,10 @@ export default function RecordPage() {
 
   const handleEditOrder = (order: Order) => {
     setEditingOrder(order)
-    setItems(order.items.map(i => ({
-      ...i,
-      quantity: i.quantity || 1
-    })))
-    setPaymentType(order.payment)
+    // Parse items from note field
+    const noteItems = parseNoteToItems(order.note || '')
+    setItems(noteItems.length > 0 ? noteItems : [{ description: order.note || 'รายการงาน', width: 0, height: 0, price: order.total, quantity: 1 }])
+    setPaymentType(order.payment || 'โอนเงิน')
   }
 
   const handleUpdateOrder = async () => {
@@ -140,8 +137,8 @@ export default function RecordPage() {
         total,
         items: items.map(i => ({
           description: i.description,
-          width: i.width,
-          height: i.height,
+          width: 0,
+          height: 0,
           price: i.price,
           quantity: 1,
         }))
@@ -153,8 +150,7 @@ export default function RecordPage() {
       loadOrders()
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } } }
-      const msg = error?.response?.data?.error || 'เกิดข้อผิดพลาด'
-      toast.error(msg)
+      toast.error(error?.response?.data?.error || 'เกิดข้อผิดพลาด')
     } finally {
       setSaving(false)
     }
@@ -166,13 +162,39 @@ export default function RecordPage() {
     const day = date.getDate()
     const month = date.getMonth() + 1
     const year = date.getFullYear() + 543
-    return `${day}/${month}/${year}`
+    const h = date.getHours().toString().padStart(2, '0')
+    const m = date.getMinutes().toString().padStart(2, '0')
+    return `${day}/${month}/${year} ${h}:${m}`
   }
 
-  const getItemsDescription = (order: Order) => {
-    if (!order?.items || order.items.length === 0) return '-'
-    if (order.items.length === 1) return order.items[0].description || 'รายการงาน'
-    return `${order.items[0].description || 'รายการงาน'} และอีก ${order.items.length - 1} รายการ`
+  // Parse note field to display description — note format: "ชำระ: โอนเงิน | itemA | itemB"
+  const parseNoteDisplay = (note?: string): string => {
+    if (!note) return '-'
+    // Remove payment prefix if present
+    let display = note.replace(/^ชำระ:\s*[^\|]+\|\s*/, '')
+    // Trim and show first item
+    display = display.split('|')[0].trim()
+    return display || note
+  }
+
+  const parsePaymentFromNote = (order: Order): string => {
+    if (order.payment) return order.payment
+    if (!order.note) return '-'
+    const match = order.note.match(/^ชำระ:\s*([^\|]+)/)
+    return match ? match[1].trim() : '-'
+  }
+
+  const parseNoteToItems = (note: string): JobItem[] => {
+    // Remove payment prefix
+    const cleaned = note.replace(/^ชำระ:\s*[^\|]+\|\s*/, '')
+    const parts = cleaned.split('|').map(s => s.trim()).filter(Boolean)
+    return parts.map(desc => ({
+      description: desc,
+      width: 0,
+      height: 0,
+      price: 0,
+      quantity: 1,
+    }))
   }
 
   return (
@@ -199,29 +221,34 @@ export default function RecordPage() {
       </div>
 
       <div className="record-layout">
-        
+
         {/* Form Section */}
         <div className="card">
           <form onSubmit={handleAdd}>
             <div className="form-group">
               <label className="form-label">ชื่องาน / รายละเอียด</label>
-              <input className="form-input" value={desc} onChange={e => setDesc(e.target.value)} placeholder="เช่น ไวนิลโปรโมชั่นหน้าร้าน" autoFocus required />
-            </div>
-            
-            <div style={{ display: 'flex', gap: 12 }}>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label className="form-label">ความกว้าง (เมตร)</label>
-                <input type="number" step="0.01" min="0" className="form-input" value={width} onChange={e => setWidth(e.target.value)} placeholder="0.00" />
-              </div>
-              <div className="form-group" style={{ flex: 1 }}>
-                <label className="form-label">ความยาว (เมตร)</label>
-                <input type="number" step="0.01" min="0" className="form-input" value={height} onChange={e => setHeight(e.target.value)} placeholder="0.00" />
-              </div>
+              <input
+                className="form-input"
+                value={desc}
+                onChange={e => setDesc(e.target.value)}
+                placeholder="เช่น ไวนิลโปรโมชั่นหน้าร้าน"
+                autoFocus
+                required
+              />
             </div>
 
             <div className="form-group">
               <label className="form-label">ราคา (บาท)</label>
-              <input type="number" min="0" step="0.01" className="form-input" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" required />
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className="form-input"
+                value={price}
+                onChange={e => setPrice(e.target.value)}
+                placeholder="0.00"
+                required
+              />
             </div>
 
             <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
@@ -246,9 +273,6 @@ export default function RecordPage() {
                   <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, alignItems: 'flex-start', gap: 8 }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 500 }}>{item.description}</div>
-                      {(item.width > 0 && item.height > 0) && (
-                        <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>{item.width} x {item.height} m</div>
-                      )}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontWeight: 600 }}>{item.price.toLocaleString('th-TH')}฿</span>
@@ -276,13 +300,13 @@ export default function RecordPage() {
               </select>
             </div>
 
-            <button 
-              className="btn btn-primary" 
+            <button
+              className="btn btn-primary"
               style={{ width: '100%', justifyContent: 'center', padding: '11px 0', fontSize: 14 }}
               onClick={editingOrder ? handleUpdateOrder : handleSave}
               disabled={items.length === 0 || saving}
             >
-              <Printer size={16} /> {saving ? 'กำลังบันทึก...' : editingOrder ? 'บันทึกการแก้ไข' : 'บันทึกและพิมพ์บิล'}
+              <ShoppingCart size={16} /> {saving ? 'กำลังบันทึก...' : editingOrder ? 'บันทึกการแก้ไข' : 'บันทึก'}
             </button>
           </div>
         </div>
@@ -314,13 +338,15 @@ export default function RecordPage() {
                   </td>
                 </tr>
               ) : orders?.length > 0 ? (
-                orders.slice(0, 10).map(order => (
+                orders.slice(0, 20).map(order => (
                   <tr key={order?.id}>
-                    <td style={{ fontSize: 13 }}>{formatDate(order?.created_at)}</td>
-                    <td style={{ fontWeight: 500 }}>{getItemsDescription(order)}</td>
+                    <td style={{ fontSize: 12 }}>{formatDate(order?.created_at)}</td>
+                    <td style={{ fontWeight: 500, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {parseNoteDisplay(order?.note)}
+                    </td>
                     <td>
-                      <span className={`badge badge-${order?.payment === 'เงินสด' ? 'success' : 'info'}`} style={{ fontSize: 12 }}>
-                        {order?.payment || '-'}
+                      <span className={`badge badge-${parsePaymentFromNote(order) === 'เงินสด' ? 'success' : 'info'}`} style={{ fontSize: 11 }}>
+                        {parsePaymentFromNote(order)}
                       </span>
                     </td>
                     <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--success)' }}>
@@ -330,7 +356,7 @@ export default function RecordPage() {
                       <button className="btn-icon" onClick={() => handleEditOrder(order)} title="แก้ไข">
                         <Pencil size={14} />
                       </button>
-                      <button className="btn-icon delete" onClick={() => handleDeleteOrder(order?.id)} title="ลบ">
+                      <button className="btn-icon delete" onClick={() => handleDeleteOrder(order?.id)} title="ลบ" style={{ marginLeft: 4 }}>
                         <Trash2 size={14} />
                       </button>
                     </td>

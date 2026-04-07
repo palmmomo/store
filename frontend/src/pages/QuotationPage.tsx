@@ -588,14 +588,13 @@ export default function QuotationPage() {
 
       </div>
 
-      {/* Print Styles */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap');
         
         @media print {
           @page {
             size: A4;
-            margin: 15mm;
+            margin: 0mm;
           }
           
           body * {
@@ -613,8 +612,11 @@ export default function QuotationPage() {
             top: 0;
             width: 100%;
             box-shadow: none !important;
-            padding: 0 !important;
+            padding: 20mm !important;
+            margin: 0 !important;
             font-family: 'Sarabun', sans-serif !important;
+            background: white !important;
+            min-height: 297mm;
           }
           
           button,

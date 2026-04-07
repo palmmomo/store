@@ -1,11 +1,10 @@
 package handlers
 
 import (
-	"fmt"
-	"net/http"
-	"time"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
+	"net/http"
 
 	"store-backend/db"
 	"store-backend/middleware"
@@ -14,14 +13,14 @@ import (
 )
 
 type branchRow struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Address   string    `json:"address"`
-	Phone     string    `json:"phone"`
-	LogoUrl   string    `json:"logo_url"`
-	IsActive  bool      `json:"is_active"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Address   string `json:"address"`
+	Phone     string `json:"phone"`
+	LogoUrl   string `json:"logo_url"`
+	IsActive  bool   `json:"is_active"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }
 
 // GetBranches returns all branches (superadmin: all, others: own branch)
@@ -66,35 +65,42 @@ func CreateBranch(c *gin.Context) {
 	}
 
 	branchID := generateBranchID()
-	now := time.Now()
+
+	// Only include fields that are guaranteed to exist in the branches table
 	data := map[string]interface{}{
-		"id":         branchID,
-		"name":       req.Name,
-		"address":    req.Address,
-		"phone":      req.Phone,
-		"logo_url":   req.LogoUrl,
-		"is_active":  true,
-		"created_at": now,
-		"updated_at": now,
+		"id":   branchID,
+		"name": req.Name,
+	}
+	if req.Address != "" {
+		data["address"] = req.Address
+	}
+	if req.Phone != "" {
+		data["phone"] = req.Phone
+	}
+	if req.LogoUrl != "" {
+		data["logo_url"] = req.LogoUrl
 	}
 
 	var result []branchRow
 	if err := db.Client.Insert("branches", data, &result); err != nil {
+		fmt.Printf("[CreateBranch] Supabase insert error: %v\n", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	if len(result) == 0 {
-		// Return the data we sent since Supabase may not return it
-		c.JSON(http.StatusCreated, gin.H{
-			"id": branchID, "name": req.Name,
-			"address": req.Address, "phone": req.Phone,
-			"logo_url": req.LogoUrl, "is_active": true,
-		})
+	// Return what we know even if Supabase doesn't return the row
+	responseData := map[string]interface{}{
+		"id": branchID, "name": req.Name,
+		"address": req.Address, "phone": req.Phone,
+		"logo_url": req.LogoUrl, "is_active": true,
+	}
+	if len(result) > 0 {
+		c.JSON(http.StatusCreated, result[0])
 		return
 	}
-	c.JSON(http.StatusCreated, result[0])
+	c.JSON(http.StatusCreated, responseData)
 }
+
 
 // UpdateBranch updates a branch by ID (superadmin only)
 func UpdateBranch(c *gin.Context) {

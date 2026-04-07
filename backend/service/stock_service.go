@@ -252,15 +252,15 @@ func (s *stockService) SimplePurchaseMaterial(branchID string, userID string, re
 	if err != nil {
 		return err
 	}
-	
+
 	var material *models.Material
-	for _, m := range materials {
-		if m.Name == req.ItemName {
-			material = &m
+	for i := range materials {
+		if materials[i].Name == req.ItemName {
+			material = &materials[i] // Fix: use index to avoid range variable copy bug
 			break
 		}
 	}
-	
+
 	// 2. If not exists, create new material
 	if material == nil {
 		newMaterial := &models.Material{
@@ -277,6 +277,18 @@ func (s *stockService) SimplePurchaseMaterial(branchID string, userID string, re
 		if err != nil {
 			return fmt.Errorf("ไม่สามารถสร้างวัสดุใหม่ได้: %v", err)
 		}
+		// Re-fetch to get the real ID assigned by DB
+		if newMaterial.ID == 0 {
+			refreshed, err := s.repo.FindAllMaterials(branchID)
+			if err == nil {
+				for i := range refreshed {
+					if refreshed[i].Name == req.ItemName {
+						newMaterial = &refreshed[i]
+						break
+					}
+				}
+			}
+		}
 		material = newMaterial
 	} else {
 		// 3. Update existing material stock
@@ -286,23 +298,25 @@ func (s *stockService) SimplePurchaseMaterial(branchID string, userID string, re
 			return fmt.Errorf("ไม่สามารถอัปเดตยอดสต๊อกได้: %v", err)
 		}
 	}
-	
-	// 4. Record purchase transaction
-	purchaseRecord := &models.PurchaseTransaction{
-		BranchID:     branchID,
-		MaterialID:   material.ID,
-		SupplierID:   1, // Default supplier
-		Quantity:     req.Quantity,
-		TotalPrice:   req.Price,
-		UnitCost:     req.Price / req.Quantity,
-		PurchaseDate: time.Now(),
-		ReceiptNo:    req.StoreName,
+
+	// 4. Record purchase transaction (only if material has a valid ID)
+	if material.ID > 0 {
+		purchaseRecord := &models.PurchaseTransaction{
+			BranchID:     branchID,
+			MaterialID:   material.ID,
+			SupplierID:   1, // Default supplier
+			Quantity:     req.Quantity,
+			TotalPrice:   req.Price,
+			UnitCost:     req.Price / req.Quantity,
+			PurchaseDate: time.Now(),
+			ReceiptNo:    req.StoreName,
+		}
+
+		if err := s.repo.InsertPurchase(purchaseRecord); err != nil {
+			fmt.Printf("Warning: could not record purchase transaction: %v\n", err)
+		}
 	}
-	
-	if err := s.repo.InsertPurchase(purchaseRecord); err != nil {
-		return fmt.Errorf("ไม่สามารถบันทึกการซื้อได้: %v", err)
-	}
-	
+
 	// 5. Record as expense for branch cost calculation
 	storeInfo := req.StoreName
 	if storeInfo == "" {
@@ -316,12 +330,13 @@ func (s *stockService) SimplePurchaseMaterial(branchID string, userID string, re
 		"note":         fmt.Sprintf("สั่งซื้อเข้าสต๊อก: %s %.2f %s", req.ItemName, req.Quantity, req.Unit),
 		"expense_date": time.Now(),
 	}
-	
+
 	var expenseResult []map[string]interface{}
 	if err := db.Client.Insert("expenses", expenseRecord, &expenseResult); err != nil {
 		// Log error but don't fail the whole transaction
 		fmt.Printf("Warning: could not record expense: %v\n", err)
 	}
-	
+
 	return nil
 }
+

@@ -20,7 +20,7 @@
 | Auth | Supabase Auth (JWT) |
 | Deployment | Vercel (Frontend) |
 
-## สถานะปัจจุบัน (Session สุดท้าย: 2026-04-06)
+## สถานะปัจจุบัน (Session สุดท้าย: 2026-04-07)
 
 ### ✅ เสร็จแล้ว
 - Frontend เชื่อมต่อกับ Backend จริง (Supabase + Gin)
@@ -28,14 +28,19 @@
 - ระบบ Login จริงด้วย Supabase Auth
 - `npm run build` ผ่านทุกครั้ง
 - หน้าสต็อกวัสดุ, ประวัติการจัดซื้อ, บันทึกรายการงาน
-- Mobile responsive (hamburger menu + sidebar overlay)
-- สร้างไฟล์ `SUPABASE_SETUP.sql` เพื่อ reference
+- Mobile responsive (hamburger menu + sidebar overlay + body scroll lock)
+- สร้างไฟล์ `SUPABASE_SETUP.sql` อัปเดตล่าสุด (Consolidated - รวม fix files)
+- Staff ดูและแก้ไขประวัติยอดขายของตัวเองได้
+- Admin ดูและแก้ไขประวัติได้ทุกสาขา
+- ระบบ Simple Purchase + Stock Update อัตโนมัติ
+- ซ่อน Tab "สั่งซื้อ" สำหรับ Admin (ดูสต็อกอย่างเดียว)
+- `go build ./...` ผ่านทุกครั้ง
 
 ### ⏳ ยังต้องทำต่อ
+- [ ] QuotationPage: PDF layout improve + unit toggle (m/cm) + branch selector
 - [ ] ระบบคำนวณราคาตาม ตร.ม. อัตโนมัติ
 - [ ] ระบบบันทึกรูปภาพงาน (Supabase Storage)
 - [ ] ระบบคิวงาน (Job Status tracking)
-- [ ] PDF Export / ใบเสร็จรับเงิน
 
 ## โครงสร้างโปรเจกต์
 
@@ -249,7 +254,32 @@ go run main.go
 - ลบการอ้างอิงถึง "เสื้อสกรีน" และ "งานสกรีน" ออกทั้งหมดตามความต้องการผู้ใช้
 
 ## สิ่งที่ต้องทำต่อ
-- [ ] เชื่อมต่อ Supabase จริง (ย้ายจาก Mock State)
+- [ ] QuotationPage: PDF ปรับ layout + เพิ่ม m/cm toggle + branch selector by role
 - [ ] ระบบคำนวณราคาตาม ตร.ม. อัตโนมัติ (เลือกประเภทวัสดุ x กว้าง x ยาว)
 - [ ] ระบบบันทึกรูปภาพงานที่พิมพ์เสร็จแล้ว (Upload to Supabase Storage)
 - [ ] ระบบคิวงาน (Job Status: รอดำเนินการ -> กำลังพิมพ์ -> รอส่งคืน -> เรียบร้อย)
+
+---
+
+### 2026-04-07 — Session 8: Bug Fix Sprint (13 Issues)
+
+**ปัญหาที่แก้ไข (Backend):**
+1. **403 Error `GET /orders`** — นำ `RequireRole` ออกจาก orders GET route ให้ทุก role เข้าถึงได้ (handler filter เองตาม JWT branch_id)
+2. **เพิ่ม PUT/DELETE orders** — `orders.go` เพิ่ม `UpdateOrder` และ `DeleteOrder` handlers พร้อม role-based permission
+3. **500 Error Simple Purchase** — `stock_service.go`: แก้ Range variable capture bug, เพิ่ม re-fetch material after create เพื่อรับ real ID จาก DB, guard `material.ID > 0` ก่อน insert purchase
+4. **`SUPABASE_SETUP.sql`** — Consolidated ใหม่: รวม `fix_duplicate_key.sql` และ `fix_duplicate_key_complete.sql` เข้าไป แล้วลบ fix files เก่าออก เพิ่ม payment column, indexes, และ RLS documentation
+5. **`orders` table** — เพิ่ม `payment` field ใน schema และ handler
+
+**ปัญหาที่แก้ไข (Frontend):**
+6. **Hamburger Menu ไม่ปิด** — `Sidebar.tsx`: เปลี่ยน overlay จาก CSS class เป็น conditional render, เพิ่ม `body scroll lock` ด้วย `useEffect`
+7. **ประวัติขายไม่แสดง** — `RecordPage.tsx`: แก้ `getItemsDescription` ให้ parse `note` field (format: `ชำระ: xxx | item1 | item2`) แทน items array ที่ไม่มีอยู่จริงใน orders table
+8. **ปุ่ม Edit/Delete ใน RecordPage** — เพิ่มปุ่มแก้ไขและลบใน history table สำหรับ staff
+9. **SalesHistoryPage Role-based** — Admin: ดูทุกสาขา + edit/delete; Staff: เห็นเฉพาะสาขาตัวเอง + edit/delete เฉพาะของตัวเอง, เพิ่ม Edit Modal
+10. **StockPage Admin view** — ซ่อน tab "สั่งซื้อของเข้าร้าน" สำหรับ admin/superadmin
+11. **Numeric input placeholder** — เปลี่ยน default state จาก `0` เป็น `''` ใน StockPage, ใช้ `placeholder="0.00"`
+12. **RecordPage ซ่อน Width/Height** — ซ่อนฟิลด์กว้าง/ยาว ให้กรอกแค่ชื่อและราคา
+13. **Sidebar ปุ่ม X** — แก้ให้แสดงบน mobile เสมอ, X button ปิด sidebar ได้อย่างถูกต้อง
+
+**ยังต้องทำต่อ:**
+- QuotationPage: PDF layout improve, unit toggle m/cm, branch selector by role
+- ตรวจสอบว่า `payment` column มีอยู่ใน Supabase (รัน Section 6 ของ SUPABASE_SETUP.sql)

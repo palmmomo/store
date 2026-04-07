@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -17,6 +17,7 @@ const navItems = [
   { to: '/quotation', icon: <FileText size={18} />, label: 'ใบเสนอราคา', roles: ['superadmin', 'admin', 'staff'] },
   { to: '/sales-history', icon: <TrendingUp size={18} />, label: 'ประวัติยอดขาย', roles: ['superadmin', 'admin', 'staff'] },
 ]
+
 const adminItems = [
   { to: '/admin/branches', icon: <Building2 size={18} />, label: 'จัดการสาขา' },
   { to: '/admin/users', icon: <Users size={18} />, label: 'จัดการผู้ใช้' },
@@ -27,11 +28,21 @@ const adminItems = [
 export default function Sidebar() {
   const { user, logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  // Lock body scroll when sidebar is open on mobile
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [mobileOpen])
+
   if (!user) return null
 
   const allowedNav = navItems.filter(item => item.roles.includes(user.role))
-
-  const handleNavClick = () => setMobileOpen(false)
+  const closeSidebar = () => setMobileOpen(false)
 
   return (
     <>
@@ -40,11 +51,14 @@ export default function Sidebar() {
         <Menu size={20} />
       </button>
 
-      {/* Overlay backdrop */}
-      <div
-        className={`sidebar-overlay${mobileOpen ? ' mobile-open' : ''}`}
-        onClick={() => setMobileOpen(false)}
-      />
+      {/* Overlay backdrop — click anywhere to close */}
+      {mobileOpen && (
+        <div
+          className="sidebar-overlay mobile-open"
+          onClick={closeSidebar}
+          style={{ cursor: 'pointer' }}
+        />
+      )}
 
       <aside className={`sidebar${mobileOpen ? ' mobile-open' : ''}`}>
         <div className="sidebar-logo" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -53,18 +67,24 @@ export default function Sidebar() {
             <p>ระบบจัดการร้านป้าย</p>
           </div>
           <button
-            onClick={() => setMobileOpen(false)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'none' }}
+            onClick={closeSidebar}
             className="sidebar-close-btn"
             aria-label="ปิดเมนู"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
           >
             <X size={18} />
           </button>
         </div>
+
         <nav className="sidebar-nav">
           <div className="nav-section-label">เมนูหลัก</div>
           {allowedNav.map(item => (
-            <NavLink key={item.to} to={item.to} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} onClick={handleNavClick}>
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+              onClick={closeSidebar}
+            >
               {item.icon}{item.label}
             </NavLink>
           ))}
@@ -73,13 +93,19 @@ export default function Sidebar() {
             <>
               <div className="nav-section-label" style={{ marginTop: 8 }}>จัดการระบบ</div>
               {adminItems.map(item => (
-                <NavLink key={item.to} to={item.to} className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`} onClick={handleNavClick}>
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+                  onClick={closeSidebar}
+                >
                   {item.icon}{item.label}
                 </NavLink>
               ))}
             </>
           )}
         </nav>
+
         <div className="sidebar-footer">
           <div className="user-info">
             <div className="user-avatar">{user.email[0].toUpperCase()}</div>

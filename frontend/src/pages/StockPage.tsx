@@ -3,7 +3,7 @@ import { stockApi, branchApi } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import { toast } from 'react-hot-toast'
 import {
-  Plus, Pencil, Trash2, ArrowUpRight, ArrowDownLeft, AlertTriangle, Package, X,
+  Plus, Pencil, Trash2, ArrowDownLeft, AlertTriangle, Package, X,
   ShoppingCart, Send, Boxes
 } from 'lucide-react'
 
@@ -29,8 +29,8 @@ export default function StockPage() {
   const [showAdjust, setShowAdjust] = useState<Material | null>(null)
   const [adminBranchSelect, setAdminBranchSelect] = useState<string>('')
   const [branches, setBranches] = useState<{id: string, name: string}[]>([])
-  const [form, setForm] = useState({ name: '', category_id: 1, unit: 'ชิ้น', initial_stock: 0, min_stock_level: 0 })
-  const [adjustForm, setAdjustForm] = useState({ type: 'add' as 'add' | 'deduct', quantity: 0, reason: '' })
+  const [form, setForm] = useState({ name: '', category_id: 1, unit: 'ชิ้น', initial_stock: '' as any, min_stock_level: '' as any })
+  const [adjustForm, setAdjustForm] = useState({ type: 'add' as 'add' | 'deduct', quantity: '' as any, reason: '' })
 
   // Purchase Form
   const [purchaseItemName, setPurchaseItemName] = useState('')
@@ -111,25 +111,17 @@ export default function StockPage() {
   }
 
   const handleAdjust = async () => {
-    if (!showAdjust || adjustForm.quantity <= 0) return
+    const qty = parseFloat(String(adjustForm.quantity))
+    if (!showAdjust || isNaN(qty) || qty <= 0) return
     try {
-      if (adjustForm.type === 'add') {
-        await stockApi.purchase({
-          material_id: showAdjust.id,
-          supplier_id: 1,
-          quantity: adjustForm.quantity,
-          total_price: 0,
-        })
-      } else {
-        await stockApi.deduct({
-          material_id: showAdjust.id,
-          quantity: adjustForm.quantity,
-          notes: adjustForm.reason,
-        })
-      }
-      toast.success(adjustForm.type === 'add' ? 'เติมสต็อกสำเร็จ' : 'เบิกใช้สำเร็จ')
+      await stockApi.deduct({
+        material_id: showAdjust.id,
+        quantity: qty,
+        notes: adjustForm.reason,
+      })
+      toast.success('เบิกใช้สำเร็จ')
       setShowAdjust(null)
-      setAdjustForm({ type: 'add', quantity: 0, reason: '' })
+      setAdjustForm({ type: 'deduct', quantity: '', reason: '' })
       loadStock()
     } catch (err: any) {
       toast.error(err?.response?.data?.error || 'เกิดข้อผิดพลาด')
@@ -164,13 +156,20 @@ export default function StockPage() {
 
   const openCreate = () => {
     setEditingItem(null)
-    setForm({ name: '', category_id: 1, unit: 'ชิ้น', initial_stock: 0, min_stock_level: 0 })
+    setForm({ name: '', category_id: 1, unit: 'ชิ้น', initial_stock: '', min_stock_level: '' })
     setShowForm(true)
   }
 
   const openEdit = (item: Material) => {
+    if (!item || !item.id) return
     setEditingItem(item)
-    setForm({ name: item.name, category_id: item.category_id, unit: item.unit, initial_stock: 0, min_stock_level: item.min_stock_level })
+    setForm({
+      name: item.name,
+      category_id: item.category_id || 1,
+      unit: item.unit || 'ชิ้น',
+      initial_stock: '',
+      min_stock_level: String(item.min_stock_level ?? ''),
+    })
     setShowForm(true)
   }
 
@@ -187,12 +186,12 @@ export default function StockPage() {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — staff only sees purchase tab */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        <button 
+        <button
           onClick={() => setActiveTab('stock')}
-          style={{ 
-            flex: 1, padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, 
+          style={{
+            flex: 1, padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             background: activeTab === 'stock' ? 'var(--primary)' : 'var(--bg-card)',
             color: activeTab === 'stock' ? 'white' : 'var(--text)',
             border: '1px solid', borderColor: activeTab === 'stock' ? 'var(--primary)' : 'var(--border)',
@@ -201,18 +200,20 @@ export default function StockPage() {
         >
           <Boxes size={18} /> สต็อกวัสดุ
         </button>
-        <button 
-          onClick={() => setActiveTab('purchase')}
-          style={{ 
-            flex: 1, padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, 
-            background: activeTab === 'purchase' ? 'var(--primary)' : 'var(--bg-card)',
-            color: activeTab === 'purchase' ? 'white' : 'var(--text)',
-            border: '1px solid', borderColor: activeTab === 'purchase' ? 'var(--primary)' : 'var(--border)',
-            borderRadius: 'var(--radius-md)', fontWeight: 600, cursor: 'pointer', transition: '0.2s'
-          }}
-        >
-          <ShoppingCart size={18} /> สั่งซื้อของเข้าร้าน
-        </button>
+        {!isAdmin && (
+          <button
+            onClick={() => setActiveTab('purchase')}
+            style={{
+              flex: 1, padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              background: activeTab === 'purchase' ? 'var(--primary)' : 'var(--bg-card)',
+              color: activeTab === 'purchase' ? 'white' : 'var(--text)',
+              border: '1px solid', borderColor: activeTab === 'purchase' ? 'var(--primary)' : 'var(--border)',
+              borderRadius: 'var(--radius-md)', fontWeight: 600, cursor: 'pointer', transition: '0.2s'
+            }}
+          >
+            <ShoppingCart size={18} /> สั่งซื้อของเข้าร้าน
+          </button>
+        )}
       </div>
 
       {activeTab === 'stock' ? (
@@ -271,20 +272,21 @@ export default function StockPage() {
                         : <span className="badge badge-success">ปกติ</span>
                       }
                     </td>
-                    {!isAdmin && (
-                      <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                          <button className="btn-icon" title="เติมสต็อก" onClick={() => { setShowAdjust(s); setAdjustForm({ type: 'add', quantity: 0, reason: '' }) }}>
-                            <ArrowUpRight size={13} />
-                          </button>
-                          <button className="btn-icon" title="เบิกใช้" onClick={() => { setShowAdjust(s); setAdjustForm({ type: 'deduct', quantity: 0, reason: '' }) }}>
-                            <ArrowDownLeft size={13} />
-                          </button>
-                          <button className="btn-icon" title="แก้ไข" onClick={() => openEdit(s)}><Pencil size={13} /></button>
-                          <button className="btn-icon delete" title="ลบ" onClick={() => handleDelete(s.id)}><Trash2 size={13} /></button>
-                        </div>
-                      </td>
-                    )}
+                      {!isAdmin && (
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <button
+                              className="btn btn-secondary"
+                              style={{ padding: '4px 10px', fontSize: 12, height: 'auto', background: 'var(--primary-light)', color: 'var(--primary)', border: 'none' }}
+                              onClick={() => { setShowAdjust(s); setAdjustForm({ type: 'deduct', quantity: '', reason: '' }) }}
+                            >
+                              <ArrowDownLeft size={12} /> เบิกใช้
+                            </button>
+                            <button className="btn-icon" title="แก้ไข" onClick={() => openEdit(s)}><Pencil size={13} /></button>
+                            <button className="btn-icon delete" title="ลบ" onClick={() => handleDelete(s.id)}><Trash2 size={13} /></button>
+                          </div>
+                        </td>
+                      )}
                   </tr>
                 ))}
                 {filteredItems.length === 0 && (
@@ -321,13 +323,21 @@ export default function StockPage() {
 
             <div className="form-group">
               <label className="form-label">ชื่อวัสดุ</label>
-              <input 
+              <select 
                 className="form-input" 
                 value={purchaseItemName} 
-                onChange={e => setPurchaseItemName(e.target.value)} 
-                placeholder="พิมพ์ชื่อวัสดุ (เช่น ไวนิล, หมึกพิมพ์)"
+                onChange={e => {
+                  const m = items.find(item => item.name === e.target.value)
+                  setPurchaseItemName(e.target.value)
+                  if (m) setPurchaseUnit(m.unit)
+                }} 
                 required 
-              />
+              >
+                <option value="">-- เลือกวัสดุจากสต็อก --</option>
+                {items.map(m => (
+                  <option key={m.id} value={m.name}>{m.name} ({m.unit})</option>
+                ))}
+              </select>
             </div>
             
             <div style={{ display: 'flex', gap: 12 }}>
@@ -400,12 +410,12 @@ export default function StockPage() {
             {!editingItem && (
               <div className="form-group">
                 <label className="form-label">จำนวนเริ่มต้น (ที่ซื้อตั้งต้น)</label>
-                <input className="form-input" type="number" min="0" value={form.initial_stock} onChange={e => setForm({ ...form, initial_stock: parseFloat(e.target.value) || 0 })} />
+                <input className="form-input" type="number" min="0" value={form.initial_stock} onChange={e => setForm({ ...form, initial_stock: e.target.value })} placeholder="0.00" />
               </div>
             )}
             <div className="form-group">
               <label className="form-label">แจ้งเตือนสต็อกต่ำเมื่อน้อยกว่า</label>
-              <input className="form-input" type="number" min="0" value={form.min_stock_level} onChange={e => setForm({ ...form, min_stock_level: parseFloat(e.target.value) || 0 })} />
+              <input className="form-input" type="number" min="0" value={form.min_stock_level} onChange={e => setForm({ ...form, min_stock_level: e.target.value })} placeholder="0.00" />
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowForm(false)}>ยกเลิก</button>
@@ -422,7 +432,7 @@ export default function StockPage() {
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 420 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h2 className="modal-title" style={{ margin: 0 }}>{adjustForm.type === 'add' ? 'เติมสต็อก' : 'เบิกใช้'}: {showAdjust.name}</h2>
+              <h2 className="modal-title" style={{ margin: 0 }}>เบิกใช้: {showAdjust.name}</h2>
               <button className="btn-icon" onClick={() => setShowAdjust(null)}><X size={18} /></button>
             </div>
             <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
@@ -430,7 +440,16 @@ export default function StockPage() {
             </p>
             <div className="form-group">
               <label className="form-label">จำนวน ({showAdjust.unit})</label>
-              <input className="form-input" type="number" min="0" step="0.5" value={adjustForm.quantity || ''} onChange={e => setAdjustForm({ ...adjustForm, quantity: parseFloat(e.target.value) || 0 })} autoFocus />
+              <input 
+                className="form-input" 
+                type="number" 
+                min="0" 
+                step="0.01" 
+                value={adjustForm.quantity} 
+                onChange={e => setAdjustForm({ ...adjustForm, quantity: e.target.value })} 
+                placeholder="0.00"
+                autoFocus 
+              />
             </div>
             {adjustForm.type === 'deduct' && (
               <div className="form-group">
@@ -440,8 +459,12 @@ export default function StockPage() {
             )}
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowAdjust(null)}>ยกเลิก</button>
-              <button className="btn btn-primary" onClick={handleAdjust} disabled={adjustForm.quantity <= 0}>
-                {adjustForm.type === 'add' ? 'เติม' : 'เบิก'}
+              <button
+                className="btn btn-primary"
+                onClick={handleAdjust}
+                disabled={!adjustForm.quantity || parseFloat(String(adjustForm.quantity)) <= 0}
+              >
+                เบิก
               </button>
             </div>
           </div>

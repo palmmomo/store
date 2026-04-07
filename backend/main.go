@@ -115,14 +115,26 @@ func initApp() {
 			stock.POST("/simple-purchase", middleware.RequireRole("superadmin", "branch_admin", "staff"), stockHandler.SimplePurchaseStock)
 			stock.POST("/deduct", stockHandler.DeductStock)
 			stock.GET("/compare/:material_id", stockHandler.GetComparison)
+			stock.GET("/purchase-history", stockHandler.GetPurchaseHistory)
 		}
 
-		// Order/POS routes
+		// Expenses routes
+		expenses := api.Group("/expenses")
+		{
+			expenses.GET("", handlers.GetExpenses)
+			expenses.POST("", handlers.CreateExpense)
+			expenses.PUT("/:id", handlers.UpdateExpense)
+			expenses.DELETE("/:id", handlers.DeleteExpense)
+		}
+
+		// Order routes
 		orders := api.Group("/orders")
 		{
-			orders.GET("", middleware.RequireRole("superadmin", "branch_admin"), handlers.GetOrders)
+			orders.GET("", handlers.GetOrders)                        // all roles, filtered by branch in handler
 			orders.GET("/:id", handlers.GetOrder)
 			orders.POST("", handlers.CreateOrder)
+			orders.PUT("/:id", handlers.UpdateOrder)
+			orders.DELETE("/:id", handlers.DeleteOrder)
 		}
 
 		// Stats routes

@@ -145,7 +145,7 @@ func (h *StockHandler) SimplePurchaseStock(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลไม่ถูกต้อง: " + err.Error()})
 		return
 	}
-	err := h.srv.SimplePurchaseMaterial(middleware.GetBranchID(c), req)
+	err := h.srv.SimplePurchaseMaterial(middleware.GetBranchID(c), middleware.GetUserID(c), req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
