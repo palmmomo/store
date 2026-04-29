@@ -4,8 +4,7 @@ import type { ReactNode } from 'react'
 interface User {
   id: string
   email: string
-  role: string
-  branch_id: string
+  role: 'admin' | 'accountant' | 'technician'
 }
 
 interface AuthContextType {
@@ -59,8 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const u: User = {
       id: data.user.id,
       email: data.user.email,
-      role: data.user.role,
-      branch_id: data.user.branch_id || '',
+      role: data.user.role || 'technician',
     }
     setToken(data.access_token)
     setUser(u)

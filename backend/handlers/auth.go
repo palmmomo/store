@@ -28,7 +28,7 @@ type supabaseAuthResponse struct {
 	} `json:"user"`
 	Error            string `json:"error"`
 	ErrorDescription string `json:"error_description"`
-	Message          string `json:"msg"` // ดักไว้สำหรับบางเคสที่ Supabase ส่ง msg มาแทน
+	Message          string `json:"msg"`
 }
 
 // Login authenticates user via Supabase Auth
@@ -43,7 +43,6 @@ func Login(c *gin.Context) {
 	supabaseAnonKey := os.Getenv("SUPABASE_ANON_KEY")
 
 	payload, _ := json.Marshal(req)
-	// URL สำหรับยิงไปที่ GoTrue (Auth service) ของ Supabase
 	url := fmt.Sprintf("%s/auth/v1/token?grant_type=password", supabaseURL)
 
 	httpReq, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
@@ -52,7 +51,6 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// บรรทัดที่ต้องมีเพื่อให้ Supabase อนุญาตให้เข้าถึง API
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("apikey", supabaseAnonKey)
 	httpReq.Header.Set("Authorization", "Bearer "+supabaseAnonKey)
@@ -71,9 +69,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// เช็คว่า Supabase ตอบกลับมาสำเร็จ (200) หรือไม่
 	log.Printf("== LOGIN RESPONSE: STATUS %d ==", resp.StatusCode)
-	log.Printf("== LOGIN RESPONSE BODY: %s ==", string(bodyBytes))
 
 	if resp.StatusCode != http.StatusOK {
 		msg := "invalid login credentials"
@@ -89,15 +85,11 @@ func Login(c *gin.Context) {
 
 	log.Printf("== LOGIN SUCCESS: USER_ID=%s ==", authResp.User.ID)
 
-	// Extract role and branch from app_metadata (ข้อมูลที่เรา Update ใน SQL Editor)
-	role := "staff"
-	branchID := ""
+	// Extract role from app_metadata
+	role := "technician"
 	if authResp.User.AppMetadata != nil {
 		if r, ok := authResp.User.AppMetadata["role"].(string); ok {
 			role = r
-		}
-		if b, ok := authResp.User.AppMetadata["branch_id"].(string); ok {
-			branchID = b
 		}
 	}
 
@@ -105,10 +97,9 @@ func Login(c *gin.Context) {
 		"access_token":  authResp.AccessToken,
 		"refresh_token": authResp.RefreshToken,
 		"user": gin.H{
-			"id":        authResp.User.ID,
-			"email":     authResp.User.Email,
-			"role":      role,
-			"branch_id": branchID,
+			"id":    authResp.User.ID,
+			"email": authResp.User.Email,
+			"role":  role,
 		},
 	})
 }
@@ -163,22 +154,20 @@ func RefreshToken(c *gin.Context) {
 	})
 }
 
-// SetupFirstAdmin is a temporary route to create the very first superadmin user
+// SetupFirstAdmin is a temporary route to create the very first admin user
 func SetupFirstAdmin(c *gin.Context) {
 	supabaseURL := os.Getenv("SUPABASE_URL")
 	serviceKey := os.Getenv("SUPABASE_SERVICE_KEY")
 
-	// 1. Create admin user
 	payload, _ := json.Marshal(map[string]interface{}{
 		"email":         "admin@admin.com",
 		"password":      "admin123456",
 		"email_confirm": true,
 		"app_metadata": map[string]interface{}{
-			"role":      "superadmin",
-			"branch_id": "",
+			"role": "admin",
 		},
 		"user_metadata": map[string]interface{}{
-			"full_name": "Super Admin",
+			"full_name": "Admin",
 		},
 	})
 

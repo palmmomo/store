@@ -1,85 +1,85 @@
-export interface Branch {
-  id: string
-  name: string
-  address: string
-  phone: string
-  is_active: boolean
-  created_at: string
-  updated_at: string
-}
-
 export interface User {
   id: string
   email: string
-  role: 'superadmin' | 'branch_admin' | 'staff'
-  branch_id: string
-}
-
-export interface Product {
-  id: string
-  branch_id: string
-  name: string
-  price: number
-  category: string
-  image_url: string
-  is_active: boolean
-  created_at: string
-  updated_at: string
+  role: 'admin' | 'accountant' | 'technician'
 }
 
 export interface StockItem {
-  id: string
-  product_id: string
-  branch_id: string
-  quantity: number
-  min_level: number
+  id: number
+  name: string
   unit: string
-  updated_at: string
-  products?: Product
-}
-
-export interface StockLog {
-  id: string
-  product_id: string
-  branch_id: string
-  change: number
-  reason: string
-  user_id: string
-  created_at: string
-  products?: { name: string; category: string }
-}
-
-export interface OrderItem {
-  id: string
-  order_id: string
-  product_id: string
   quantity: number
-  price: number
-  products?: { name: string; category: string }
-}
-
-export interface Order {
-  id: string
-  branch_id: string
-  user_id: string
-  total: number
-  status: 'pending' | 'completed' | 'cancelled'
-  note: string
   created_at: string
-  order_items?: OrderItem[]
+  updated_at: string
 }
 
-export interface DashboardStats {
-  total_revenue: number
-  total_orders: number
-  total_products: number
-  low_stock_count: number
-  revenue_today: number
-  orders_today: number
+export interface StockPurchase {
+  id: number
+  item_id: number
+  quantity: number
+  price_per_unit: number
+  total_price: number
+  supplier: string
+  purchased_by: string
+  purchased_at: string
+  note: string
+  stock_items?: { name: string; unit: string }
+  users?: { email: string }
 }
 
-export interface SalesChartData {
-  date: string
-  revenue: number
-  orders: number
+export interface StockWithdrawal {
+  id: number
+  item_id: number
+  quantity: number
+  purpose: string
+  withdrawn_by: string
+  withdrawn_at: string
+  stock_items?: { name: string; unit: string }
+  users?: { email: string }
+}
+
+export interface Branch {
+  id: number
+  name: string
+  address: string
+  phone: string
+  tax_id: string
+  created_at: string
+}
+
+export interface QuotationItem {
+  description: string
+  quantity: number
+  price_per_unit: number
+  total: number
+}
+
+export interface Quotation {
+  id: number
+  quotation_no: string
+  branch_id: number
+  customer_name: string
+  customer_address: string
+  customer_tax_id: string
+  items: QuotationItem[]
+  total_amount: number
+  total_in_words: string
+  status: 'draft' | 'sent' | 'approved'
+  created_by: string
+  created_at: string
+  branches?: { name: string }
+}
+
+export interface Job {
+  id: number
+  title: string
+  description: string
+  status: string
+  payment_status: 'unpaid' | 'deposit' | 'paid'
+  price: number
+  quotation_id: number | null
+  assigned_to: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
 }

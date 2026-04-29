@@ -1,12 +1,13 @@
-# GEMINI.md — ระบบจัดการร้านอาหาร (Multi-Branch)
+# GEMINI.md — ระบบจัดการร้านป้าย (Stock Management)
 
 ## ภาพรวมโปรเจกต์
 
-ระบบบันทึกรายการซื้อ-ขายประจำวัน (Transaction Recording) แบบ Multi-Branch
-- **ไม่ใช่ POS ขายหน้าร้าน** — เน้นการกรอกข้อมูลรายรับ/รายจ่าย
-- รองรับช่องทางชำระเงิน: เงินสด / เงินโอน
-- สรุปยอดรายวัน แยกตามสาขา
-- ธีม: **Light/White Theme** สไตล์มินิมอล ใช้ **Lucide Icons** (ไม่ใช้ Emoji)
+ระบบจัดการสต็อกสินค้า (Stock Management) แบบ Single-Shop
+- **3 Roles**: Admin, Accountant (บัญชี), Technician (ช่าง)
+- Admin: Dashboard, Stock (CRUD + ประวัติ), สาขา, ใบเสนอราคา, การดำเนินงาน, จัดการ Users
+- Accountant: ซื้อของเข้าสต็อก, ใบเสนอราคา, การดำเนินงาน
+- Technician: เบิกของออก, การดำเนินงาน
+- ธีม: **Light/White Theme** สไตล์มินิมอล ใช้ **Lucide Icons**
 
 ## Tech Stack
 
@@ -14,272 +15,153 @@
 |---|---|
 | Frontend | React 19 + Vite 8 + TypeScript (strict) |
 | Styling | Vanilla CSS (Light/White Theme + CSS Variables) |
-| Icons | Lucide React (ไม่ใช้ Emoji) |
+| Icons | Lucide React |
+| Drag & Drop | @dnd-kit/core + sortable |
+| PDF | jsPDF + html2canvas + thai-baht-text |
 | Backend | Golang + Gin Framework |
 | Database | Supabase (PostgreSQL + Auth) |
 | Auth | Supabase Auth (JWT) |
-| Deployment | Vercel (Frontend) |
+| Deployment | Vercel (Frontend + Backend Serverless) |
 
-## สถานะปัจจุบัน (Session สุดท้าย: 2026-04-07)
+## สถานะปัจจุบัน (Session: 2026-04-29)
 
 ### ✅ เสร็จแล้ว
-- Frontend เชื่อมต่อกับ Backend จริง (Supabase + Gin)
-- Deploy ขึ้น Vercel ได้ (Frontend + Backend Serverless)
-- ระบบ Login จริงด้วย Supabase Auth
-- `npm run build` ผ่านทุกครั้ง
-- หน้าสต็อกวัสดุ, ประวัติการจัดซื้อ, บันทึกรายการงาน
-- Mobile responsive (hamburger menu + sidebar overlay + body scroll lock)
-- สร้างไฟล์ `SUPABASE_SETUP.sql` อัปเดตล่าสุด (Consolidated - รวม fix files)
-- Staff ดูและแก้ไขประวัติยอดขายของตัวเองได้
-- Admin ดูและแก้ไขประวัติได้ทุกสาขา
-- ระบบ Simple Purchase + Stock Update อัตโนมัติ
-- ซ่อน Tab "สั่งซื้อ" สำหรับ Admin (ดูสต็อกอย่างเดียว)
-- `go build ./...` ผ่านทุกครั้ง
+- Phase 1: Full refactor → Single-Shop Stock Management
+- Phase 2: Branch, Quotation (PDF), Kanban Jobs, Edit/Delete History
+- Phase 2.1: Bug fixes + Dashboard summary + Accountant stock creation + Quotation→Job flow
+- 3 Roles: admin, accountant, technician
+- 7 DB tables: users, stock_items, stock_purchases, stock_withdrawals, branches, quotations, jobs
+- `go build ./...` ผ่าน
+- `npm run build` ผ่าน
 
 ### ⏳ ยังต้องทำต่อ
-- [ ] QuotationPage: PDF layout improve + unit toggle (m/cm) + branch selector
-- [ ] ระบบคำนวณราคาตาม ตร.ม. อัตโนมัติ
-- [ ] ระบบบันทึกรูปภาพงาน (Supabase Storage)
-- [ ] ระบบคิวงาน (Job Status tracking)
+- [ ] รัน SUPABASE_SETUP.sql ใน Supabase SQL Editor (Phase 2 + 2.1 tables)
+- [ ] ทดสอบกับ backend จริง
+- [ ] Deploy ขึ้น Vercel
 
 ## โครงสร้างโปรเจกต์
 
 ```
 ระบบร้านอาหาร/
-├── go.mod / go.sum
-├── main.go                    # Golang entry point (root level)
+├── SUPABASE_SETUP.sql
+├── gemini.md
 ├── backend/
-│   ├── main.go                # Alternative entry point (in backend/)
-│   ├── models/models.go
+│   ├── .env
+│   ├── main.go + app/app.go
 │   ├── db/supabase.go
 │   ├── middleware/auth.go
+│   ├── models/models.go
 │   └── handlers/
-│       ├── auth.go            # Login, refresh token
-│       ├── branches.go        # Branch CRUD
-│       ├── products.go        # Product CRUD
-│       ├── stock.go           # Stock management + logs
-│       ├── orders.go          # Orders/Transactions
-│       ├── stats.go           # Dashboard + charts + summary
-│       └── admin.go           # User management
-└── frontend/
-    ├── vercel.json            # SPA routing config
-    ├── .env.example
-    ├── .env.local             # VITE_API_URL + VITE_DEV_BYPASS=true
-    └── src/
-        ├── api/
-        │   ├── client.ts      # Axios API client + mock bypass
-        │   └── mockData.ts    # Mock data สำหรับ demo
-        ├── types/index.ts     # TypeScript interfaces
-        ├── contexts/AuthContext.tsx
-        ├── App.tsx            # Router + ALL pages (single file)
-        ├── index.css          # Light theme design system
-        └── pages/             # Legacy pages (ใช้กับ API จริง)
-            ├── DashboardPage.tsx
-            ├── StockPage.tsx
-            ├── POSPage.tsx
-            ├── StatsPage.tsx
-            ├── OrdersPage.tsx
-            ├── SummaryPage.tsx
-            ├── LogsPage.tsx
-            └── admin/
-                ├── BranchManagePage.tsx
-                └── UsersPage.tsx
+│       ├── auth.go, admin.go
+│       ├── stock_items.go
+│       ├── purchases.go (+ edit/delete)
+│       ├── withdrawals.go (+ edit/delete)
+│       ├── branches.go
+│       ├── quotations.go
+│       └── jobs.go (+ price, quotation_id, dashboard summary)
+└── frontend/src/
+    ├── api/client.ts
+    ├── types/index.ts
+    ├── contexts/AuthContext.tsx
+    ├── App.tsx
+    ├── index.css
+    ├── components/Sidebar.tsx
+    └── pages/
+        ├── LoginPage.tsx
+        ├── AdminDashboardPage.tsx (financial summary)
+        ├── AdminStockPage.tsx (stock + ประวัติ 3 tabs)
+        ├── AdminUsersPage.tsx
+        ├── BranchesPage.tsx
+        ├── QuotationPage.tsx (+ PDF html2canvas + create job)
+        ├── JobsPage.tsx (Kanban + DragOverlay + price)
+        ├── AccountantPurchasePage.tsx (+ add stock item)
+        └── TechnicianWithdrawPage.tsx
 ```
 
-## สิ่งสำคัญที่ต้องรู้
+## Sidebar Menu by Role
 
-### App.tsx เป็น Single-File Application
-- **ระบบปัจจุบันทำงานจาก `App.tsx` ไฟล์เดียว** (527 บรรทัด)
-- รวม mock data, sidebar, router, และทุก page component ไว้ในไฟล์เดียว
-- ไฟล์ใน `pages/` เป็นเวอร์ชันเก่าที่ต่อกับ API จริง (ยังไม่ได้ใช้ในตอนนี้)
-- เมื่อเชื่อมต่อ backend จริง ควรแยก pages ออกจาก App.tsx
+| เมนู | Admin | Accountant | Technician |
+|------|:-----:|:----------:|:----------:|
+| Dashboard | ✅ | ❌ | ❌ |
+| Stock | ✅ | ❌ | ❌ |
+| ซื้อของเข้า | ❌ | ✅ | ❌ |
+| เบิกของ | ❌ | ❌ | ✅ |
+| ใบเสนอราคา | ✅ | ✅ | ❌ |
+| การดำเนินงาน | ✅ | ✅ | ✅ |
+| สาขา | ✅ | ❌ | ❌ |
+| จัดการผู้ใช้ | ✅ | ❌ | ❌ |
 
-### Mock Data & Dev Bypass
-- ตั้ง `VITE_DEV_BYPASS=true` ใน `.env.local` เพื่อใช้ mock data
-- Login ด้วย `admin` / `admin` (ค่า hardcoded สำหรับ demo เท่านั้น)
-- Mock data อยู่ใน `src/api/mockData.ts`
+## API Routes
 
-### TypeScript Strict Mode
-- ใช้ `verbatimModuleSyntax` → **ต้องใช้ `import type { ... }` สำหรับ type imports เสมอ**
-- Recharts Tooltip formatter → ใช้ `(v: any) => [...]` แทน `(v: number) => [...]`
-
-## User Roles
-
-| Role | สิทธิ์ |
-|---|---|
-| `admin` | เข้าถึงทุกอย่าง รวมถึงจัดการสาขาและ user ทุกสาขา |
-| `staff` | บันทึกรายการ, ดู/ปรับสต็อกสาขาตัวเอง |
-
-## Environment Variables
-
-### Backend (.env)
 ```
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_KEY=...       # Service Role Key (ใช้ใน backend เท่านั้น)
-SUPABASE_JWT_SECRET=...        # จาก Supabase Settings > API > JWT Secret
-PORT=8080
-FRONTEND_URL=http://localhost:5173
+POST /api/auth/login | /api/auth/refresh | /api/auth/setup
+
+GET/POST           /api/stock       (all / admin+accountant for POST)
+PUT/DELETE         /api/stock/:id   (admin)
+
+GET/POST/PUT/DELETE /api/purchases   (admin, accountant)
+GET/POST/PUT/DELETE /api/withdrawals (admin, technician)
+GET/POST/PUT/DELETE /api/branches    (admin)
+GET/POST/PUT/DELETE /api/quotations  (admin, accountant)
+POST               /api/quotations/:id/create-job (admin, accountant)
+GET/POST/PUT/DELETE /api/jobs        (all)
+GET                 /api/dashboard/summary (admin)
+GET/POST/PUT/DELETE /api/admin/users (admin)
+GET                 /api/admin/history (admin)
 ```
 
-### Frontend (.env.local)
-```
-VITE_API_URL=http://localhost:8080
-VITE_DEV_BYPASS=true           # ใช้ mock data (ปิดเมื่อต่อ backend จริง)
-```
+## Activity Log
 
-## วิธีรัน
+### 2026-04-29 — Phase 2: System Extension (6 Features)
 
-### Frontend (Development)
-```powershell
-cd "c:\Work\ระบบร้านอาหาร\frontend"
-npm run dev
-# เปิด http://localhost:5173
-```
+1. **Admin Sidebar** — Dashboard เป็น placeholder, Stock page รวม 3 tabs (สต็อก, ซื้อเข้า, เบิกออก)
+2. **Edit/Delete History** — ทุก purchase/withdrawal แก้ไข/ลบได้ พร้อม stock diff auto-update
+3. **Branch Management** — CRUD สาขาสำหรับใบเสนอราคา
+4. **Quotation System** — CRUD + PDF export (jsPDF) + Thai number-to-words
+5. **Kanban Job Board** — 5 สถานะ drag-and-drop + payment status colors
+6. **Updated Sidebar** — เมนูตาม role matrix ใหม่
 
-### Frontend (Build)
-```powershell
-cd "c:\Work\ระบบร้านอาหาร\frontend"
-npm run build
-# output อยู่ที่ frontend/dist/
-```
+Files created: branches.go, quotations.go, jobs.go, AdminStockPage.tsx, BranchesPage.tsx, QuotationPage.tsx, JobsPage.tsx
+Files modified: purchases.go, withdrawals.go, main.go, app.go, client.ts, types/index.ts, App.tsx, Sidebar.tsx, SUPABASE_SETUP.sql
+Files deleted: AdminHistoryPage.tsx
 
-### Backend
-```powershell
-cd "c:\Work\ระบบร้านอาหาร"
-go run main.go
-```
+### 2026-04-29 — Phase 2.1: Bug Fixes + New Features
 
-## Vercel Deployment
+**Bug Fixes:**
+1. **ใบเสนอราคา — Number overflow** → ใช้ parseFloat ถูกต้อง, ป้องกัน NaN
+2. **ใบเสนอราคา — ตัวอักษรไทย** → ใช้ `thai-baht-text` library แทน custom function
+3. **PDF — ภาษาไทย** → เปลี่ยนจาก jsPDF text เป็น `html2canvas` + Sarabun font
+4. **Input spinners** → ปิด spinner ด้วย CSS `.qty-input`
 
-- GitHub Repo: `palmmomo/store`
-- Branches: `main` (production), `dev` (development)
-- Vercel Settings:
-  - **Root Directory:** `frontend`
-  - **Framework Preset:** Vite
-  - **Build Command:** `npm run build`
-  - **Output Directory:** `dist`
-- `vercel.json` อยู่ใน `frontend/` จัดการ SPA routing (rewrite ทุก path ไป `index.html`)
+**New Features:**
+5. **Dashboard — Financial Summary** → 3 cards: รายได้/ค่าวัสดุ/กำไรสุทธิ
+6. **Accountant — เพิ่มสินค้าใหม่** → ปุ่ม "เพิ่มสินค้าใหม่" ในหน้าซื้อของ
+7. **ใบเสนอราคา → สร้างงาน** → Modal ถาม + POST /api/quotations/:id/create-job
+8. **Jobs — ราคางาน** → เพิ่ม field price + quotation_id ใน jobs table
+9. **Kanban — Drag & Drop ปรับปรุง** → DragOverlay, closestCorners, DroppableColumn highlight
 
-## Supabase Setup
+Files modified: jobs.go, main.go, app.go, client.ts, types/index.ts, QuotationPage.tsx, JobsPage.tsx, AdminDashboardPage.tsx, AccountantPurchasePage.tsx, index.css, SUPABASE_SETUP.sql
 
-> **ดู `SUPABASE_SETUP.sql`** ในโฟลเดอร์รากของโปรเจกต์สำหรับ SQL script ทั้งหมด
+### 2026-04-29 — Phase 2.2: Auth & Mobile Patches
 
-ตาราง (Tables) ที่ต้องสร้าง:
+**Bug Fixes:**
+1. **Branch Access (403)** → เปิด `GET /api/branches` ให้ Accountant เข้าถึงได้ (สำหรับดึงข้อมูลลงใบเสนอราคา) ใน `main.go` และ `app.go`
+2. **Quotation Access** → ยืนยันว่า `GET /api/quotations` และ frontend route `/quotation` เปิดให้ Accountant เข้าถึงได้เรียบร้อยแล้ว
 
-| Table | คำอธิบาย |
-|---|---|
-| `branches` | ข้อมูลสาขา (id = TEXT เช่น BR-abc1234) |
-| `user_profiles` | เชื่อม user กับ auth.users, เก็บ role และ branch_id |
-| `categories` | หมวดหมู่วัสดุ (id = INT auto-increment) |
-| `suppliers` | คู่ค้า/ร้านค้าวัสดุ |
-| `materials` | รายการวัสดุแต่ละสาขา |
-| `purchase_transactions` | ประวัติการซื้อวัสดุ |
-| `usage_transactions` | ประวัติการเบิกวัสดุ |
-| `orders` | บิลงานอิงค์เจ็ท (id = UUID) |
+**Mobile Responsiveness:**
+3. **Sidebar Menu** → ยืนยันการมีอยู่ของ Hamburger Menu สำหรับ Mobile ใน `Sidebar.tsx` พร้อมปรับแต่ง CSS Overlay
+4. **Kanban Board** → เพิ่ม horizontal scroll ใน `index.css`
+5. **Tables** → เพิ่ม horizontal scroll ให้กับตาราง
+6. **Modals** → ปรับ Modal ให้แสดงผลแบบเต็มจอ (bottom sheet) บนมือถือ
+7. **Quotation Items** → ปรับ layout input แถวรายการสินค้าให้เป็น block / flex wrap เพื่อการพิมพ์ที่ง่ายขึ้นบนมือถือ
 
-การตั้ง Role ใน Supabase Auth Admin — ใส่ `app_metadata`:
-```json
-{
-  "role": "superadmin",
-  "branch_id": "BR-xxxxxxxx"
-}
-```
+### 2026-04-29 — Phase 2.3: Mobile UX Fixes
 
-## การเปลี่ยนแปลง / Activity Log
+**UX Improvements:**
+1. **Layout / Sidebar** → แก้บัค `html, body` scroll ซ้ายขวา ด้วย `overflow-x: hidden` + `max-width: 100vw`. แก้ให้ Sidebar ดันคอนเทนต์มาเป็น full-width ตอนใช้มือถือ
+2. **Card Tables** → เพิ่ม `.responsive-table` ในตาราง `BranchesPage`, `AdminStockPage`, และ `QuotationPage` เพื่อแสดงข้อมูลในรูปแบบ Card (data-label) บนจอมือถือ
+3. **Kanban Board** → เพิ่ม `TouchSensor` ให้กับ `@dnd-kit/core` สำหรับการ Drag and Drop บนมือถือ, ใช้ `.kanban-dots` แสดงจุดสถานะตำแหน่งสกอร์ลของคอลัมน์ (active state)
+4. **Quotation Form** → จัดหน้าตาฟอร์มกรอกรายการสินค้าแบบ Card stack บนมือถือด้วย `.field-label` และซ่อน Header ตารางหลัก
 
-### 2026-03-20 — Session 1: Initial Setup + Redesign
-- สร้าง Golang backend (Gin + JWT + Supabase REST client)
-- Handler ครบ: auth, branches, products, stock, orders, stats, admin
-- สร้าง React frontend (Vite + TypeScript)
-- เริ่มต้นเป็น Dark Theme → **เปลี่ยนเป็น Light/White Theme** ตามความต้องการ
-- เปลี่ยนจาก POS → **ระบบบันทึกรายการซื้อ-ขาย (Transaction Recording)**
-- นำ Emoji ออกทั้งหมด → ใช้ **Lucide Icons** แทน
-- เพิ่มฟีเจอร์: เงินสด/เงินโอน, Dashboard สรุปยอด, กราฟ 30 วัน
-- แก้ TypeScript Build Errors (7 errors): `import type`, Recharts formatter types
-- สร้าง `vercel.json` สำหรับ SPA routing
-- Push ขึ้น GitHub สำเร็จ (branch: `main` + `dev`)
+Files modified: `index.css`, `JobsPage.tsx`, `QuotationPage.tsx`, `BranchesPage.tsx`, `AdminStockPage.tsx`
 
-### 2026-03-20 — Session 2: Admin Dashboard & Branch Details
-- เปลี่ยนชื่อหน้า Dashboard เป็น **Admin Dashboard** (ภาพรวมทุกสาขา)
-- เพิ่มการติดตาม **สาขา (Branch)** ในทุกรายการบันทึก (Transaction)
-- เพิ่มหน้า **Branch Detail** แสดง:
-  - รายรับแยก เงินสด / ออนไลน์ (เงินโอน)
-  - สต็อกวัตถุดิบแยกตามสาขา
-  - ข้อมูลตามหมวดหมู่
-- เพิ่มปุ่ม **เพิ่มสาขาใหม่** ในหน้าจัดการสาขา พร้อม Modal
-- เพิ่มปุ่ม **แก้ไข/ลบ** ในหน้าจัดการผู้ใช้
-- อัปเดต Sidebar และ Routing ให้รองรับระบบ Admin เต็มรูปแบบ
-- แก้ไขปัญหา Unused Variables ใน `App.tsx`
-
-### 2026-03-20 — Session 3: Role-Based Access & View Separation
-- แยกหน้า **Admin Overview** และ **Branch Recording** ออกจากกันอย่างชัดเจน
-- เพิ่มระบบ **Mock Login / Role Switcher** สำหรับเดโม (Admin, Staff)
-- **Admin**: เข้าถึงได้ทุกหน้า (Dashboard รวม, รายงานทั้งหมด, จัดการผู้ใช้/สาขา)
-- **Staff**:
-  - ดูได้เฉพาะเมนู **บันทึกรายการ** และ **สต็อกวัตถุดิบ** ของสาขาตัวเอง
-  - ระบบล็อคสาขาอัตโนมัติในหน้ากรอกข้อมูล (ไม่สามารถเลือกสาขาอื่นได้)
-  - หน้า Dashboard รวมจะถูก Redirect ไปที่หน้าบันทึกรายการแทน
-- ปรับปรุง UI หน้าบันทึกรายการให้รองรับการล็อคข้อมูลตามสิทธิ์
-
-### 2026-03-20 — Session 4: Mock CRUD for Branches & Users
-- ยกยอดข้อมูล `MOCK_BRANCHES` และ `MOCK_USERS` ขึ้นไปไว้ใน State ของ `App.tsx`
-- **ระบบจัดการสาขา (Mock)**: สามารถกด "เพิ่มสาขาใหม่" และข้อมูลจะอัปเดตเข้าระบบทันที (สำหรับ Session นั้น)
-- **ระบบจัดการผู้ใช้ (Mock)**: 
-  - สามารถ เพิ่ม/แก้ไข/ลบ ผู้ใช้ได้จริงใน Mock State
-  - เพิ่ม **ตัวเลือกสาขา (Branch Selector)** ในหน้าจัดการผู้ใช้ เพื่อกำหนดสาขาให้พนักงาน
-- ปรับปรุง Sidebar ให้รองรับการสลับ User ตามรายการผู้ใช้ที่อัปเดตล่าสุด
-- แก้ปัญหา TypeScript Error เกี่ยวกับ `useEffect` และ `INITIAL_USER`
-
-### 2026-04-06 — Session 7: Bug Fixes, Mobile Responsive & SQL Update
-
-**ปัญหาที่แก้ไข:**
-1. **ปุ่ม Login** — เพิ่ม `justifyContent: center` ให้ปุ่ม "เข้าสู่ระบบ" อยู่กึ่งกลาง
-2. **เพิ่มสาขาไม่ได้** — `branches.go` แก้ไขให้ Generate `id` ในรูปแบบ `BR-xxxxxxxx` (TEXT) เนื่องจาก DB schema ไม่ใช้ UUID auto-generate
-3. **Mobile Responsive** — เพิ่ม hamburger menu + sidebar overlay + breakpoints ครบถ้วน
-4. **501 Error / ส่งข้อมูลไม่ได้** — `orders.go` ถูก Rewrite ให้รองรับ inkjet job data (description, width, height, price) แทน product_id แบบเก่า
-5. **ความกว้าง/ยาวติดลบ** — `RecordPage.tsx` เพิ่ม `min="0"` + `Math.max(0,...)` validation
-6. **เพิ่มวัสดุไม่ได้** — แก้ไข `StockPage.tsx` ให้ส่ง `initial_stock` field ถูกต้อง
-7. **สร้างไฟล์ SQL** — สร้าง `SUPABASE_SETUP.sql` พร้อม seed data
-8. **อัปเดต gemini.md** — อัปเดต Schema Section และ Activity Log
-
-- **ธุรกิจหลัก**: เปลี่ยนจากร้านอาหาร/ร้านไวนิล เป็น **ร้านป้ายอิงค์เจ็ท (Inkjet Signage Shop)**
-- **Mock Data**: อัปเดตรายการซื้อ-ขายและสต็อกเป็นวัสดุงานป้ายทั้งหมด:
-  - งานอิงค์เจ็ท (ตร.ม.), ป้ายไวนิล, สติ๊กเกอร์ PVC
-  - งานโครงสร้าง, Standee, X-Frame, ธงญี่ปุ่น
-- **Stock Management**: ติดตามวัสดุแบบม้วน (ไวนิล, สติ๊กเกอร์), หมึกพิมพ์ Outdoor CMYK, และวัสดุแผ่น (PP Board)
-- **Smart Parser**: ปรับปรุงให้รองรับหน่วย "ตรม" (ตารางเมตร) และคำค้นหาเกี่ยวกับงานป้าย (ไวนิล, พิมพ์, โครง, ขาตั้ง)
-- **UI Branding**: เปลี่ยนไอคอนเป็น `Printer` และชื่อระบบเป็น **"งานอิงค์เจ็ท"**
-- แก้ปัญหา Syntax Error ในหน้าบันทึกกิจกรรม (LogsPage)
-- ลบการอ้างอิงถึง "เสื้อสกรีน" และ "งานสกรีน" ออกทั้งหมดตามความต้องการผู้ใช้
-
-## สิ่งที่ต้องทำต่อ
-- [ ] QuotationPage: PDF ปรับ layout + เพิ่ม m/cm toggle + branch selector by role
-- [ ] ระบบคำนวณราคาตาม ตร.ม. อัตโนมัติ (เลือกประเภทวัสดุ x กว้าง x ยาว)
-- [ ] ระบบบันทึกรูปภาพงานที่พิมพ์เสร็จแล้ว (Upload to Supabase Storage)
-- [ ] ระบบคิวงาน (Job Status: รอดำเนินการ -> กำลังพิมพ์ -> รอส่งคืน -> เรียบร้อย)
-
----
-
-### 2026-04-07 — Session 8: Bug Fix Sprint (13 Issues)
-
-**ปัญหาที่แก้ไข (Backend):**
-1. **403 Error `GET /orders`** — นำ `RequireRole` ออกจาก orders GET route ให้ทุก role เข้าถึงได้ (handler filter เองตาม JWT branch_id)
-2. **เพิ่ม PUT/DELETE orders** — `orders.go` เพิ่ม `UpdateOrder` และ `DeleteOrder` handlers พร้อม role-based permission
-3. **500 Error Simple Purchase** — `stock_service.go`: แก้ Range variable capture bug, เพิ่ม re-fetch material after create เพื่อรับ real ID จาก DB, guard `material.ID > 0` ก่อน insert purchase
-4. **`SUPABASE_SETUP.sql`** — Consolidated ใหม่: รวม `fix_duplicate_key.sql` และ `fix_duplicate_key_complete.sql` เข้าไป แล้วลบ fix files เก่าออก เพิ่ม payment column, indexes, และ RLS documentation
-5. **`orders` table** — เพิ่ม `payment` field ใน schema และ handler
-
-**ปัญหาที่แก้ไข (Frontend):**
-6. **Hamburger Menu ไม่ปิด** — `Sidebar.tsx`: เปลี่ยน overlay จาก CSS class เป็น conditional render, เพิ่ม `body scroll lock` ด้วย `useEffect`
-7. **ประวัติขายไม่แสดง** — `RecordPage.tsx`: แก้ `getItemsDescription` ให้ parse `note` field (format: `ชำระ: xxx | item1 | item2`) แทน items array ที่ไม่มีอยู่จริงใน orders table
-8. **ปุ่ม Edit/Delete ใน RecordPage** — เพิ่มปุ่มแก้ไขและลบใน history table สำหรับ staff
-9. **SalesHistoryPage Role-based** — Admin: ดูทุกสาขา + edit/delete; Staff: เห็นเฉพาะสาขาตัวเอง + edit/delete เฉพาะของตัวเอง, เพิ่ม Edit Modal
-10. **StockPage Admin view** — ซ่อน tab "สั่งซื้อของเข้าร้าน" สำหรับ admin/superadmin
-11. **Numeric input placeholder** — เปลี่ยน default state จาก `0` เป็น `''` ใน StockPage, ใช้ `placeholder="0.00"`
-12. **RecordPage ซ่อน Width/Height** — ซ่อนฟิลด์กว้าง/ยาว ให้กรอกแค่ชื่อและราคา
-13. **Sidebar ปุ่ม X** — แก้ให้แสดงบน mobile เสมอ, X button ปิด sidebar ได้อย่างถูกต้อง
-
-**ยังต้องทำต่อ:**
-- QuotationPage: PDF layout improve, unit toggle m/cm, branch selector by role
-- ตรวจสอบว่า `payment` column มีอยู่ใน Supabase (รัน Section 6 ของ SUPABASE_SETUP.sql)
