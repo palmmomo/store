@@ -183,10 +183,47 @@ func DeletePurchase(c *gin.Context) {
 // GetPurchases returns purchase history
 func GetPurchases(c *gin.Context) {
 	var purchases []map[string]interface{}
-	query := "select=*,stock_items(name,unit),users(email)&order=purchased_at.desc&limit=200"
+	// Remove users(email) because purchased_by points to auth.users, which PostgREST cannot join automatically.
+	query := "select=*,stock_items(name,unit)&order=purchased_at.desc&limit=200"
 	if err := db.Client.Query("stock_purchases", query, &purchases); err != nil {
+		fmt.Printf("GetPurchases Error: %v\n", err)
 		c.JSON(http.StatusOK, []map[string]interface{}{})
 		return
 	}
+
+	// Fetch users manually to join emails
+	var users []map[string]interface{}
+	userMap := make(map[string]string)
+	if err := db.Client.Query("users", "select=id,email", &users); err == nil {
+		for _, u := range users {
+			if id, ok := u["id"].(string); ok {
+				if email, ok := u["email"].(string); ok {
+					userMap[id] = email
+				}
+			}
+		}
+	}
+
+	// Flatten fields for frontend
+	for i, p := range purchases {
+		if si, ok := p["stock_items"].(map[string]interface{}); ok {
+			if name, ok := si["name"].(string); ok {
+				p["item_name"] = name
+			}
+			if unit, ok := si["unit"].(string); ok {
+				p["item_unit"] = unit
+			}
+		}
+		
+		// Map user email
+		if userID, ok := p["purchased_by"].(string); ok {
+			if email, exists := userMap[userID]; exists {
+				p["purchased_by_email"] = email
+			}
+		}
+		
+		purchases[i] = p
+	}
+
 	c.JSON(http.StatusOK, purchases)
 }

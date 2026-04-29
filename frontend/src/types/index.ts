@@ -25,6 +25,9 @@ export interface StockPurchase {
   note: string
   stock_items?: { name: string; unit: string }
   users?: { email: string }
+  item_name?: string
+  item_unit?: string
+  purchased_by_email?: string
 }
 
 export interface StockWithdrawal {
@@ -36,6 +39,9 @@ export interface StockWithdrawal {
   withdrawn_at: string
   stock_items?: { name: string; unit: string }
   users?: { email: string }
+  item_name?: string
+  item_unit?: string
+  withdrawn_by_email?: string
 }
 
 export interface Branch {

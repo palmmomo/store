@@ -162,10 +162,47 @@ func DeleteWithdrawal(c *gin.Context) {
 // GetWithdrawals returns withdrawal history
 func GetWithdrawals(c *gin.Context) {
 	var withdrawals []map[string]interface{}
-	query := "select=*,stock_items(name,unit),users(email)&order=withdrawn_at.desc&limit=200"
+	// Remove users(email) because withdrawn_by points to auth.users, which PostgREST cannot join automatically.
+	query := "select=*,stock_items(name,unit)&order=withdrawn_at.desc&limit=200"
 	if err := db.Client.Query("stock_withdrawals", query, &withdrawals); err != nil {
+		fmt.Printf("GetWithdrawals Error: %v\n", err)
 		c.JSON(http.StatusOK, []map[string]interface{}{})
 		return
 	}
+
+	// Fetch users manually to join emails
+	var users []map[string]interface{}
+	userMap := make(map[string]string)
+	if err := db.Client.Query("users", "select=id,email", &users); err == nil {
+		for _, u := range users {
+			if id, ok := u["id"].(string); ok {
+				if email, ok := u["email"].(string); ok {
+					userMap[id] = email
+				}
+			}
+		}
+	}
+
+	// Flatten fields for frontend
+	for i, w := range withdrawals {
+		if si, ok := w["stock_items"].(map[string]interface{}); ok {
+			if name, ok := si["name"].(string); ok {
+				w["item_name"] = name
+			}
+			if unit, ok := si["unit"].(string); ok {
+				w["item_unit"] = unit
+			}
+		}
+		
+		// Map user email
+		if userID, ok := w["withdrawn_by"].(string); ok {
+			if email, exists := userMap[userID]; exists {
+				w["withdrawn_by_email"] = email
+			}
+		}
+		
+		withdrawals[i] = w
+	}
+
 	c.JSON(http.StatusOK, withdrawals)
 }
