@@ -28,30 +28,32 @@ export default function LoginPage() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#f8fafc',
+      background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
     }}>
       <div style={{
         background: 'white',
-        borderRadius: '8px',
-        padding: '32px 40px',
-        width: '400px',
-        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+        borderRadius: '16px',
+        padding: '40px 44px',
+        width: '420px',
+        maxWidth: '90vw',
+        boxShadow: '0 20px 60px -12px rgb(0 0 0 / 0.12), 0 8px 16px -8px rgb(0 0 0 / 0.08)',
       }}>
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <div style={{
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: 56,
-            height: 56,
+            width: 60,
+            height: 60,
             borderRadius: 16,
-            background: 'var(--primary)',
+            background: 'linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%)',
             color: 'white',
             marginBottom: 16,
+            boxShadow: '0 8px 24px -4px rgba(99, 102, 241, 0.4)',
           }}>
             <Printer size={28} />
           </div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>งานอิงค์เจ็ท</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>งานอิงค์เจ็ท</h1>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>ระบบจัดการร้านป้าย</p>
         </div>
 
@@ -86,12 +88,13 @@ export default function LoginPage() {
 
           {error && (
             <div style={{
-              padding: '8px 12px',
-              background: 'var(--danger-bg, #fef2f2)',
+              padding: '10px 14px',
+              background: '#fef2f2',
               color: 'var(--danger)',
               borderRadius: 'var(--radius-sm)',
               fontSize: 13,
               marginBottom: 16,
+              border: '1px solid #fecaca',
             }}>
               {error}
             </div>
@@ -102,12 +105,11 @@ export default function LoginPage() {
             className="btn btn-primary"
             type="submit"
             disabled={loading}
-            style={{ width: '100%', marginTop: 8, padding: '10px 0', fontSize: 14, justifyContent: 'center' }}
+            style={{ width: '100%', marginTop: 8, padding: '12px 0', fontSize: 14, justifyContent: 'center' }}
           >
             {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
           </button>
         </form>
-
       </div>
     </div>
   )

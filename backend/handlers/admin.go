@@ -13,7 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetUsers returns all users (superadmin only)
+// GetUsers returns all users (admin only)
 func GetUsers(c *gin.Context) {
 	supabaseURL := os.Getenv("SUPABASE_URL")
 	serviceKey := os.Getenv("SUPABASE_SERVICE_KEY")
@@ -41,15 +41,21 @@ func GetUsers(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-// UpdateUserRole updates a user's role and branch in app_metadata
+// UpdateUserRole updates a user's role in app_metadata
 func UpdateUserRole(c *gin.Context) {
 	userID := c.Param("id")
 	var req struct {
-		Role     string `json:"role" binding:"required"`
-		BranchID string `json:"branch_id"`
+		Role string `json:"role" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate role
+	validRoles := map[string]bool{"admin": true, "accountant": true, "technician": true}
+	if !validRoles[req.Role] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "role must be admin, accountant, or technician"})
 		return
 	}
 
@@ -58,8 +64,7 @@ func UpdateUserRole(c *gin.Context) {
 
 	payload, _ := json.Marshal(map[string]interface{}{
 		"app_metadata": map[string]interface{}{
-			"role":      req.Role,
-			"branch_id": req.BranchID,
+			"role": req.Role,
 		},
 	})
 
@@ -81,6 +86,11 @@ func UpdateUserRole(c *gin.Context) {
 	}
 	defer resp.Body.Close()
 
+	// Also update users table
+	_ = db.Client.Update("users", fmt.Sprintf("id=eq.%s", userID), map[string]interface{}{
+		"role": req.Role,
+	}, nil)
+
 	body, _ := io.ReadAll(resp.Body)
 	var result map[string]interface{}
 	json.Unmarshal(body, &result)
@@ -88,14 +98,11 @@ func UpdateUserRole(c *gin.Context) {
 }
 
 // CreateUser creates a new user with email+password via Supabase Admin API
-// then inserts a profile into user_profiles table
 func CreateUser(c *gin.Context) {
 	var req struct {
 		Email    string `json:"email" binding:"required,email"`
 		Password string `json:"password" binding:"required,min=6"`
-		FullName string `json:"full_name"`
 		Role     string `json:"role"`
-		BranchID string `json:"branch_id"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -103,23 +110,26 @@ func CreateUser(c *gin.Context) {
 	}
 
 	if req.Role == "" {
-		req.Role = "staff"
+		req.Role = "technician"
+	}
+
+	// Validate role
+	validRoles := map[string]bool{"admin": true, "accountant": true, "technician": true}
+	if !validRoles[req.Role] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "role must be admin, accountant, or technician"})
+		return
 	}
 
 	supabaseURL := os.Getenv("SUPABASE_URL")
 	serviceKey := os.Getenv("SUPABASE_SERVICE_KEY")
 
-	// 1. Create user in Supabase Auth with password
+	// 1. Create user in Supabase Auth
 	payload, _ := json.Marshal(map[string]interface{}{
 		"email":         req.Email,
 		"password":      req.Password,
-		"email_confirm": true, // skip email verification
+		"email_confirm": true,
 		"app_metadata": map[string]interface{}{
-			"role":      req.Role,
-			"branch_id": req.BranchID,
-		},
-		"user_metadata": map[string]interface{}{
-			"full_name": req.FullName,
+			"role": req.Role,
 		},
 	})
 
@@ -150,18 +160,15 @@ func CreateUser(c *gin.Context) {
 		return
 	}
 
-	// 2. Insert profile into user_profiles table
+	// 2. Insert into users table
 	userID, _ := authResult["id"].(string)
 	if userID != "" {
-		profileData := map[string]interface{}{
-			"id":        userID,
-			"email":     req.Email,
-			"full_name": req.FullName,
-			"role":      req.Role,
-			"branch_id": req.BranchID,
+		userData := map[string]interface{}{
+			"id":    userID,
+			"email": req.Email,
+			"role":  req.Role,
 		}
-		// Ignore error — profile is supplementary
-		_ = db.Client.Insert("user_profiles", profileData, nil)
+		_ = db.Client.Insert("users", userData, nil)
 	}
 
 	c.JSON(http.StatusCreated, authResult)
@@ -188,22 +195,9 @@ func DeleteUser(c *gin.Context) {
 		return
 	}
 	defer resp.Body.Close()
+
+	// Also delete from users table
+	_ = db.Client.Delete("users", fmt.Sprintf("id=eq.%s", userID))
+
 	c.JSON(http.StatusOK, gin.H{"message": "user deleted"})
-}
-
-// GetActivityLogs returns all stock and order activity
-func GetActivityLogs(c *gin.Context) {
-	branchFilter := c.Query("branch_id")
-	query := "select=*,auth.users(email)&order=created_at.desc&limit=200"
-	if branchFilter != "" {
-		query += fmt.Sprintf("&branch_id=eq.%s", branchFilter)
-	}
-
-	var logs []map[string]interface{}
-	if err := db.Client.Query("logs", query, &logs); err != nil {
-		// Return empty array instead of 500 error if table is missing or fails
-		c.JSON(http.StatusOK, []map[string]interface{}{})
-		return
-	}
-	c.JSON(http.StatusOK, logs)
 }

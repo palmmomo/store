@@ -8,9 +8,6 @@ import (
 	"store-backend/handlers"
 	"store-backend/middleware"
 
-	"store-backend/repository"
-	"store-backend/service"
-
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -22,45 +19,24 @@ func InitApp() {
 	if Engine != nil {
 		return
 	}
-
-	// Load .env file robustly
-	err := godotenv.Load()
-	if err != nil {
-		// Try to fallback to ../frontend/.env or ./.env.local if they exist
-		_ = godotenv.Load("../frontend/.env")
-	}
-
+	_ = godotenv.Load()
 	log.Println("=== STARTUP CHECKS ===")
 	log.Printf("SUPABASE_URL: '%s'\n", os.Getenv("SUPABASE_URL"))
-	if os.Getenv("SUPABASE_URL") == "" {
-		log.Println("👉 WARNING: SUPABASE_URL is EMPTY!")
-	}
 	log.Println("======================")
-
-	// Init Supabase client
 	db.Init()
 
-	stockRepo := repository.NewStockRepository()
-	stockService := service.NewStockService(stockRepo)
-	stockHandler := handlers.NewStockHandler(stockService)
-
-	// Setup Gin
 	if os.Getenv("VERCEL") == "1" {
 		gin.SetMode(gin.ReleaseMode)
 	}
-
 	Engine = gin.Default()
 
 	frontendURL := os.Getenv("FRONTEND_URL")
 	if frontendURL == "" {
 		frontendURL = "http://localhost:5173"
 	}
-	
-	// Strip trailing slash if present to avoid CORS header mismatch
 	if len(frontendURL) > 0 && frontendURL[len(frontendURL)-1] == '/' {
 		frontendURL = frontendURL[:len(frontendURL)-1]
 	}
-
 	Engine.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{frontendURL, "https://store-psi-bice.vercel.app", "http://localhost:5173"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
@@ -80,67 +56,62 @@ func InitApp() {
 	api := Engine.Group("/api")
 	api.Use(middleware.AuthMiddleware())
 	{
-		branches := api.Group("/branches")
-		{
-			branches.GET("", handlers.GetBranches)
-			branches.POST("", middleware.RequireRole("superadmin"), handlers.CreateBranch)
-			branches.PUT("/:id", middleware.RequireRole("superadmin"), handlers.UpdateBranch)
-			branches.DELETE("/:id", middleware.RequireRole("superadmin"), handlers.DeleteBranch)
-		}
-
-		products := api.Group("/products")
-		{
-			products.GET("", handlers.GetProducts)
-			products.GET("/:id", handlers.GetProduct)
-			products.POST("", middleware.RequireRole("superadmin", "branch_admin"), handlers.CreateProduct)
-			products.PUT("/:id", middleware.RequireRole("superadmin", "branch_admin"), handlers.UpdateProduct)
-			products.DELETE("/:id", middleware.RequireRole("superadmin", "branch_admin"), handlers.DeleteProduct)
-		}
-
 		stock := api.Group("/stock")
 		{
-			stock.POST("/items", middleware.RequireRole("superadmin", "branch_admin", "staff"), stockHandler.CreateStockItem)
-			stock.GET("", stockHandler.GetStock)
-			stock.GET("/items/:id", stockHandler.GetStockByID)
-			stock.PUT("/items/:id", middleware.RequireRole("superadmin", "branch_admin", "staff"), stockHandler.UpdateStockItem)
-			stock.DELETE("/items/:id", middleware.RequireRole("superadmin", "branch_admin", "staff"), stockHandler.DeleteStockItem)
-
-			stock.POST("/purchase", middleware.RequireRole("superadmin", "branch_admin", "staff"), stockHandler.PurchaseStock)
-			stock.GET("/purchases", middleware.RequireRole("superadmin", "branch_admin", "staff"), stockHandler.GetPurchaseHistory)
-			stock.POST("/deduct", stockHandler.DeductStock)
-			stock.GET("/compare/:material_id", stockHandler.GetComparison)
+			stock.GET("", handlers.GetStockItems)
+			stock.GET("/:id", handlers.GetStockItem)
+			stock.POST("", middleware.RequireRole("admin", "accountant"), handlers.CreateStockItem)
+			stock.PUT("/:id", middleware.RequireRole("admin"), handlers.UpdateStockItem)
+			stock.DELETE("/:id", middleware.RequireRole("admin"), handlers.DeleteStockItem)
 		}
-
-		orders := api.Group("/orders")
+		purchases := api.Group("/purchases")
+		purchases.Use(middleware.RequireRole("admin", "accountant"))
 		{
-			orders.GET("", middleware.RequireRole("superadmin", "branch_admin"), handlers.GetOrders)
-			orders.GET("/:id", handlers.GetOrder)
-			orders.POST("", handlers.CreateOrder)
+			purchases.GET("", handlers.GetPurchases)
+			purchases.POST("", handlers.CreatePurchase)
+			purchases.PUT("/:id", handlers.UpdatePurchase)
+			purchases.DELETE("/:id", handlers.DeletePurchase)
 		}
-
-		expenses := api.Group("/expenses")
+		withdrawals := api.Group("/withdrawals")
+		withdrawals.Use(middleware.RequireRole("admin", "technician"))
 		{
-			expenses.GET("", handlers.GetExpenses)
-			expenses.POST("", handlers.CreateExpense)
-			expenses.PUT("/:id", handlers.UpdateExpense)
-			expenses.DELETE("/:id", handlers.DeleteExpense)
+			withdrawals.GET("", handlers.GetWithdrawals)
+			withdrawals.POST("", handlers.CreateWithdrawal)
+			withdrawals.PUT("/:id", handlers.UpdateWithdrawal)
+			withdrawals.DELETE("/:id", handlers.DeleteWithdrawal)
 		}
-
-		stats := api.Group("/stats")
+		branches := api.Group("/branches")
 		{
-			stats.GET("/dashboard", middleware.RequireRole("superadmin", "branch_admin"), handlers.GetDashboard)
-			stats.GET("/chart", middleware.RequireRole("superadmin", "branch_admin"), handlers.GetSalesChart)
-			stats.GET("/summary", middleware.RequireRole("superadmin", "branch_admin"), handlers.GetSummary)
+			branches.GET("", middleware.RequireRole("admin", "accountant"), handlers.GetBranches)
+			branches.POST("", middleware.RequireRole("admin"), handlers.CreateBranch)
+			branches.PUT("/:id", middleware.RequireRole("admin"), handlers.UpdateBranch)
+			branches.DELETE("/:id", middleware.RequireRole("admin"), handlers.DeleteBranch)
 		}
-
+		quotations := api.Group("/quotations")
+		quotations.Use(middleware.RequireRole("admin", "accountant"))
+		{
+			quotations.GET("", handlers.GetQuotations)
+			quotations.POST("", handlers.CreateQuotation)
+			quotations.PUT("/:id", handlers.UpdateQuotation)
+			quotations.DELETE("/:id", handlers.DeleteQuotation)
+			quotations.POST("/:id/create-job", handlers.CreateJobFromQuotation)
+		}
+		jobs := api.Group("/jobs")
+		{
+			jobs.GET("", handlers.GetJobs)
+			jobs.POST("", handlers.CreateJob)
+			jobs.PUT("/:id", handlers.UpdateJob)
+			jobs.DELETE("/:id", handlers.DeleteJob)
+		}
+		api.GET("/dashboard/summary", middleware.RequireRole("admin"), handlers.GetDashboardSummary)
 		admin := api.Group("/admin")
-		admin.Use(middleware.RequireRole("superadmin"))
+		admin.Use(middleware.RequireRole("admin"))
 		{
 			admin.GET("/users", handlers.GetUsers)
 			admin.POST("/users", handlers.CreateUser)
 			admin.PUT("/users/:id/role", handlers.UpdateUserRole)
 			admin.DELETE("/users/:id", handlers.DeleteUser)
-			admin.GET("/logs", handlers.GetActivityLogs)
+			admin.GET("/history", handlers.GetHistory)
 		}
 	}
 }

@@ -40,38 +40,32 @@ func AuthMiddleware() gin.HandlerFunc {
 		tokenStr := parts[1]
 
 		claims := &SupabaseClaims{}
-		// 🛠️ แก้ไขตรงนี้: ใช้ ParseUnverified เพื่อข้ามปัญหา ES256 vs HS256
 		_, _, err := new(jwt.Parser).ParseUnverified(tokenStr, claims)
 
 		if err != nil {
-			fmt.Printf("❌ JWT Parse Error: %v\n", err)
+			fmt.Printf("JWT Parse Error: %v\n", err)
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
 			c.Abort()
 			return
 		}
 
-		// Extract app_metadata role (set by Supabase admin)
+		// Extract app_metadata role
 		userRole := ""
-		branchID := ""
 		if claims.AppMetadata != nil {
 			if r, ok := claims.AppMetadata["role"].(string); ok {
 				userRole = r
 			}
-			if b, ok := claims.AppMetadata["branch_id"].(string); ok {
-				branchID = b
-			}
 		}
 
-		// Default role from token
+		// Default role
 		if userRole == "" {
-			userRole = "staff"
+			userRole = "technician"
 		}
 
-		// Set ข้อมูลลง Context ของ Gin ให้ Handler อื่นเรียกใช้
+		// Set context values
 		c.Set("user_id", claims.Sub)
 		c.Set("user_email", claims.Email)
 		c.Set("user_role", userRole)
-		c.Set("branch_id", branchID)
 
 		c.Next()
 	}
@@ -109,12 +103,6 @@ func GetUserID(c *gin.Context) string {
 // GetUserRole helper to get user role from context
 func GetUserRole(c *gin.Context) string {
 	v, _ := c.Get("user_role")
-	return fmt.Sprintf("%v", v)
-}
-
-// GetBranchID helper to get branch ID from context
-func GetBranchID(c *gin.Context) string {
-	v, _ := c.Get("branch_id")
 	return fmt.Sprintf("%v", v)
 }
 

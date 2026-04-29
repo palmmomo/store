@@ -2,140 +2,90 @@ package models
 
 import "time"
 
-// Branch represents a restaurant branch
-type Branch struct {
+// User represents a system user linked to Supabase auth.users
+type User struct {
 	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Address   string    `json:"address"`
-	Phone     string    `json:"phone"`
-	IsActive  bool      `json:"is_active"`
+	Email     string    `json:"email"`
+	Role      string    `json:"role"` // admin, accountant, technician
 	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// UserProfile represents a user with their role and branch
-type UserProfile struct {
-	ID       string `json:"id"`
-	UserID   string `json:"user_id"`
-	FullName string `json:"full_name"`
-	Role     string `json:"role"` // superadmin, branch_admin, staff
-	BranchID string `json:"branch_id"`
-	Email    string `json:"email"`
-}
-
-// Product represents a product/menu item
-type Product struct {
-	ID        string    `json:"id"`
-	BranchID  string    `json:"branch_id"`
+// StockItem represents an item in inventory
+type StockItem struct {
+	ID        int       `json:"id"`
 	Name      string    `json:"name"`
-	Price     float64   `json:"price"`
-	Category  string    `json:"category"`
-	ImageURL  string    `json:"image_url"`
-	IsActive  bool      `json:"is_active"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// Stock represents stock level for a product at a branch
-type Stock struct {
-	ID        string    `json:"id"`
-	ProductID string    `json:"product_id"`
-	BranchID  string    `json:"branch_id"`
-	Quantity  int       `json:"quantity"`
-	MinLevel  int       `json:"min_level"`
 	Unit      string    `json:"unit"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Product   *Product  `json:"product,omitempty"`
-}
-
-// StockLog represents a stock change event
-type StockLog struct {
-	ID        string    `json:"id"`
-	ProductID string    `json:"product_id"`
-	BranchID  string    `json:"branch_id"`
-	Change    int       `json:"change"`
-	Reason    string    `json:"reason"`
-	UserID    string    `json:"user_id"`
+	Quantity  float64   `json:"quantity"`
 	CreatedAt time.Time `json:"created_at"`
-	Product   *Product  `json:"product,omitempty"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// Order represents a POS order
-type Order struct {
-	ID        string      `json:"id"`
-	BranchID  string      `json:"branch_id"`
-	UserID    string      `json:"user_id"`
-	Total     float64     `json:"total"`
-	Status    string      `json:"status"` // pending, completed, cancelled
-	Note      string      `json:"note"`
-	Items     []OrderItem `json:"items,omitempty"`
-	CreatedAt time.Time   `json:"created_at"`
+// StockPurchase represents a purchase record (accountant buys stock in)
+type StockPurchase struct {
+	ID           int       `json:"id"`
+	ItemID       int       `json:"item_id"`
+	Quantity     float64   `json:"quantity"`
+	PricePerUnit float64   `json:"price_per_unit"`
+	TotalPrice   float64   `json:"total_price"`
+	Supplier     string    `json:"supplier"`
+	PurchasedBy  string    `json:"purchased_by"`
+	PurchasedAt  time.Time `json:"purchased_at"`
+	Note         string    `json:"note"`
+	// Joined fields
+	ItemName  string `json:"item_name,omitempty"`
+	ItemUnit  string `json:"item_unit,omitempty"`
+	UserEmail string `json:"user_email,omitempty"`
 }
 
-// OrderItem represents a line item in an order
-type OrderItem struct {
-	ID        string   `json:"id"`
-	OrderID   string   `json:"order_id"`
-	ProductID string   `json:"product_id"`
-	Quantity  int      `json:"quantity"`
-	Price     float64  `json:"price"`
-	Product   *Product `json:"product,omitempty"`
+// StockWithdrawal represents a withdrawal record (technician takes stock out)
+type StockWithdrawal struct {
+	ID          int       `json:"id"`
+	ItemID      int       `json:"item_id"`
+	Quantity    float64   `json:"quantity"`
+	Purpose     string    `json:"purpose"`
+	WithdrawnBy string    `json:"withdrawn_by"`
+	WithdrawnAt time.Time `json:"withdrawn_at"`
+	// Joined fields
+	ItemName  string `json:"item_name,omitempty"`
+	ItemUnit  string `json:"item_unit,omitempty"`
+	UserEmail string `json:"user_email,omitempty"`
 }
 
-// Request/Response types
+// Request types
 
-type LoginRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
-}
-
-type LoginResponse struct {
-	Token        string      `json:"token"`
-	RefreshToken string      `json:"refresh_token"`
-	User         UserProfile `json:"user"`
-}
-
-type CreateBranchRequest struct {
-	Name    string `json:"name" binding:"required"`
-	Address string `json:"address"`
-	Phone   string `json:"phone"`
-}
-
-type CreateProductRequest struct {
-	BranchID string  `json:"branch_id" binding:"required"`
+type CreateStockItemRequest struct {
 	Name     string  `json:"name" binding:"required"`
-	Price    float64 `json:"price" binding:"required,gt=0"`
-	Category string  `json:"category"`
-	ImageURL string  `json:"image_url"`
+	Unit     string  `json:"unit" binding:"required"`
+	Quantity float64 `json:"quantity"`
 }
 
-type UpdateStockRequest struct {
-	Change int    `json:"change" binding:"required"`
-	Reason string `json:"reason" binding:"required"`
+type UpdateStockItemRequest struct {
+	Name     string  `json:"name"`
+	Unit     string  `json:"unit"`
+	Quantity float64 `json:"quantity"`
 }
 
-type CreateOrderRequest struct {
-	BranchID string             `json:"branch_id" binding:"required"`
-	Note     string             `json:"note"`
-	Items    []OrderItemRequest `json:"items" binding:"required,min=1"`
+type CreatePurchaseRequest struct {
+	ItemID       int     `json:"item_id" binding:"required"`
+	Quantity     float64 `json:"quantity" binding:"required,gt=0"`
+	PricePerUnit float64 `json:"price_per_unit"`
+	TotalPrice   float64 `json:"total_price"`
+	Supplier     string  `json:"supplier"`
+	Note         string  `json:"note"`
 }
 
-type OrderItemRequest struct {
-	ProductID string `json:"product_id" binding:"required"`
-	Quantity  int    `json:"quantity" binding:"required,gt=0"`
+type CreateWithdrawalRequest struct {
+	ItemID   int     `json:"item_id" binding:"required"`
+	Quantity float64 `json:"quantity" binding:"required,gt=0"`
+	Purpose  string  `json:"purpose"`
 }
 
-type DashboardStats struct {
-	TotalRevenue  float64 `json:"total_revenue"`
-	TotalOrders   int     `json:"total_orders"`
-	TotalProducts int     `json:"total_products"`
-	LowStockCount int     `json:"low_stock_count"`
-	RevenueToday  float64 `json:"revenue_today"`
-	OrdersToday   int     `json:"orders_today"`
+type CreateUserRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=6"`
+	Role     string `json:"role" binding:"required"`
 }
 
-type SalesChartData struct {
-	Date    string  `json:"date"`
-	Revenue float64 `json:"revenue"`
-	Orders  int     `json:"orders"`
+type UpdateUserRoleRequest struct {
+	Role string `json:"role" binding:"required"`
 }

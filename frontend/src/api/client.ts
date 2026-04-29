@@ -1,25 +1,22 @@
 import axios from 'axios'
+import type { QuotationItem } from '../types'
 
 let API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
-if (API_URL.endsWith('/')) {
-  API_URL = API_URL.slice(0, -1)
-}
+if (API_URL.endsWith('/')) API_URL = API_URL.slice(0, -1)
 
 const api = axios.create({
   baseURL: `${API_URL}/api`,
   headers: { 'Content-Type': 'application/json' },
 })
 
-// Attach JWT token to every request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
-// Handle 401 → redirect to login
 api.interceptors.response.use(
-  (response) => response,
+  (r) => r,
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('access_token')
@@ -31,86 +28,60 @@ api.interceptors.response.use(
   }
 )
 
-// =====================
-// Branch API
-// =====================
+export const stockApi = {
+  getAll: () => api.get('/stock'),
+  getById: (id: number) => api.get(`/stock/${id}`),
+  create: (d: { name: string; unit: string; quantity?: number }) => api.post('/stock', d),
+  update: (id: number, d: { name?: string; unit?: string; quantity?: number }) => api.put(`/stock/${id}`, d),
+  delete: (id: number) => api.delete(`/stock/${id}`),
+}
+
+export const purchaseApi = {
+  getAll: () => api.get('/purchases'),
+  create: (d: { item_id: number; quantity: number; price_per_unit?: number; total_price?: number; supplier?: string; note?: string }) => api.post('/purchases', d),
+  update: (id: number, d: { item_id?: number; quantity?: number; price_per_unit?: number; total_price?: number; supplier?: string; note?: string }) => api.put(`/purchases/${id}`, d),
+  delete: (id: number) => api.delete(`/purchases/${id}`),
+}
+
+export const withdrawalApi = {
+  getAll: () => api.get('/withdrawals'),
+  create: (d: { item_id: number; quantity: number; purpose?: string }) => api.post('/withdrawals', d),
+  update: (id: number, d: { item_id?: number; quantity?: number; purpose?: string }) => api.put(`/withdrawals/${id}`, d),
+  delete: (id: number) => api.delete(`/withdrawals/${id}`),
+}
+
 export const branchApi = {
   getAll: () => api.get('/branches'),
-  create: (data: { name: string; address: string; phone: string }) => api.post('/branches', data),
-  update: (id: string, data: { name?: string; address?: string; phone?: string }) => api.put(`/branches/${id}`, data),
-  delete: (id: string) => api.delete(`/branches/${id}`),
+  create: (d: { name: string; address?: string; phone?: string; tax_id?: string }) => api.post('/branches', d),
+  update: (id: number, d: { name?: string; address?: string; phone?: string; tax_id?: string }) => api.put(`/branches/${id}`, d),
+  delete: (id: number) => api.delete(`/branches/${id}`),
 }
 
-// =====================
-// Stock / Materials API
-// =====================
-export const stockApi = {
-  getAll: (branchId?: string) => api.get('/stock', { params: branchId ? { branch_id: branchId } : {} }),
-  getById: (id: number) => api.get(`/stock/items/${id}`),
-  create: (data: { name: string; category_id: number; unit: string; initial_stock: number; min_stock_level: number }) =>
-    api.post('/stock/items', data),
-  update: (id: number, data: { name?: string; category_id?: number; unit?: string; min_stock_level?: number }) =>
-    api.put(`/stock/items/${id}`, data),
-  delete: (id: number) => api.delete(`/stock/items/${id}`),
-  purchase: (data: { material_id: number; supplier_id: number; quantity: number; total_price: number; receipt_no?: string }) =>
-    api.post('/stock/purchase', data),
-  simplePurchase: (data: { item_name: string; quantity: number; unit: string; price: number; store_name?: string }) =>
-    api.post('/stock/simple-purchase', data),
-  deduct: (data: { material_id: number; quantity: number; job_id?: number; notes?: string }) =>
-    api.post('/stock/deduct', data),
-  compare: (materialId: number) => api.get(`/stock/compare/${materialId}`),
-  getPurchases: () => api.get('/stock/purchases'),
+export const quotationApi = {
+  getAll: () => api.get('/quotations'),
+  create: (d: { branch_id?: number; customer_name?: string; customer_address?: string; customer_tax_id?: string; items: QuotationItem[]; total_amount: number; total_in_words: string; status?: string }) => api.post('/quotations', d),
+  update: (id: number, d: { branch_id?: number; customer_name?: string; customer_address?: string; customer_tax_id?: string; items?: QuotationItem[]; total_amount?: number; total_in_words?: string; status?: string }) => api.put(`/quotations/${id}`, d),
+  delete: (id: number) => api.delete(`/quotations/${id}`),
+  createJob: (id: number) => api.post(`/quotations/${id}/create-job`),
 }
 
-// =====================
-// Expenses API
-// =====================
-export const expensesApi = {
-  getAll: () => api.get('/expenses'),
-  create: (data: { title: string; amount: number; note?: string }) => api.post('/expenses', data),
-  update: (id: number, data: { title?: string; amount?: number; note?: string }) => api.put(`/expenses/${id}`, data),
-  delete: (id: number) => api.delete(`/expenses/${id}`),
+export const jobApi = {
+  getAll: () => api.get('/jobs'),
+  create: (d: { title: string; description?: string; status?: string; payment_status?: string; price?: number; assigned_to?: string; quotation_id?: number }) => api.post('/jobs', d),
+  update: (id: number, d: { title?: string; description?: string; status?: string; payment_status?: string; price?: number; assigned_to?: string }) => api.put(`/jobs/${id}`, d),
+  delete: (id: number) => api.delete(`/jobs/${id}`),
 }
 
-// =====================
-// Admin API
-// =====================
 export const adminApi = {
   getUsers: () => api.get('/admin/users'),
-  createUser: (data: { email: string; password: string; full_name: string; role: string; branch_id: string }) =>
-    api.post('/admin/users', data),
-  updateUserRole: (id: string, data: { role: string; branch_id: string }) =>
-    api.put(`/admin/users/${id}/role`, data),
+  createUser: (d: { email: string; password: string; role: string }) => api.post('/admin/users', d),
+  updateUserRole: (id: string, d: { role: string }) => api.put(`/admin/users/${id}/role`, d),
   deleteUser: (id: string) => api.delete(`/admin/users/${id}`),
-  getLogs: (branchId?: string) => api.get('/admin/logs', { params: branchId ? { branch_id: branchId } : {} }),
+  getHistory: () => api.get('/admin/history'),
 }
 
-// =====================
-// Stats API
-// =====================
-export const statsApi = {
-  getDashboard: (branchId?: string) => api.get('/stats/dashboard', { params: branchId ? { branch_id: branchId } : {} }),
-  getChart: (branchId?: string) => api.get('/stats/chart', { params: branchId ? { branch_id: branchId } : {} }),
-  getSummary: (branchId?: string, period?: string) =>
-    api.get('/stats/summary', { params: { ...(branchId ? { branch_id: branchId } : {}), ...(period ? { period } : {}) } }),
-}
-
-// =====================
-// Custom/Legacy API
-// =====================
-export const orderApi = {
-  getAll: (branchId?: string) => api.get('/orders', { params: branchId ? { branch_id: branchId } : {} }),
-  getById: (id: string) => api.get(`/orders/${id}`),
-  create: (data: any) => api.post('/orders', data),
-  update: (id: string, data: any) => api.put(`/orders/${id}`, data),
-  delete: (id: string) => api.delete(`/orders/${id}`),
-}
-
-export const productApi = {
-  getAll: (branchId?: string) => api.get('/products', { params: branchId ? { branch_id: branchId } : {} }),
-  create: (data: any) => api.post('/products', data),
-  update: (id: string, data: any) => api.put(`/products/${id}`, data),
-  delete: (id: string) => api.delete(`/products/${id}`),
+export const dashboardApi = {
+  getSummary: () => api.get('/dashboard/summary'),
 }
 
 export default api
