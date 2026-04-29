@@ -183,16 +183,16 @@ export default function AdminStockPage() {
               <table className="data-table responsive-table"><thead><tr><th>วันที่</th><th>สินค้า</th><th style={{ textAlign: 'right' }}>จำนวน</th><th style={{ textAlign: 'right' }}>ราคา/หน่วย</th><th style={{ textAlign: 'right' }}>รวม</th><th>ร้าน</th><th>ผู้บันทึก</th><th>หมายเหตุ</th><th style={{ textAlign: 'center' }}>จัดการ</th></tr></thead>
               <tbody>{purchases.filter(p => {
                 const q = search.toLowerCase()
-                return (p.stock_items?.name || '').toLowerCase().includes(q) || (p.supplier || '').toLowerCase().includes(q)
+                return (p.item_name || p.stock_items?.name || '').toLowerCase().includes(q) || (p.supplier || '').toLowerCase().includes(q)
               }).map(p => (
                 <tr key={p.id}>
                   <td data-label="วันที่" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{fmt(p.purchased_at)}</td>
-                  <td data-label="สินค้า" style={{ fontWeight: 500 }}>{p.stock_items?.name || '-'}</td>
-                  <td data-label="จำนวน" style={{ textAlign: 'right' }}>{p.quantity} {p.stock_items?.unit || ''}</td>
+                  <td data-label="สินค้า" style={{ fontWeight: 500 }}>{p.item_name || p.stock_items?.name || '-'}</td>
+                  <td data-label="จำนวน" style={{ textAlign: 'right' }}>{p.quantity} {p.item_unit || p.stock_items?.unit || ''}</td>
                   <td data-label="ราคา/หน่วย" style={{ textAlign: 'right' }}>{p.price_per_unit?.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
                   <td data-label="รวม" style={{ textAlign: 'right', fontWeight: 600, color: 'var(--success)' }}>฿{p.total_price?.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
                   <td data-label="ร้าน">{p.supplier || '-'}</td>
-                  <td data-label="ผู้บันทึก" style={{ fontSize: 12 }}>{p.users?.email || '-'}</td>
+                  <td data-label="ผู้บันทึก" style={{ fontSize: 12 }}>{p.purchased_by_email || p.users?.email || '-'}</td>
                   <td data-label="หมายเหตุ" style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.note || '-'}</td>
                   <td data-label="จัดการ" style={{ textAlign: 'center' }}><div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
                     <button className="btn btn-sm" onClick={() => openEditPurchase(p)}><Pencil size={14} /></button>
@@ -213,14 +213,14 @@ export default function AdminStockPage() {
               <table className="data-table responsive-table"><thead><tr><th>วันที่</th><th>สินค้า</th><th style={{ textAlign: 'right' }}>จำนวน</th><th>เบิกเพื่อ</th><th>ผู้เบิก</th><th style={{ textAlign: 'center' }}>จัดการ</th></tr></thead>
               <tbody>{withdrawals.filter(w => {
                 const q = search.toLowerCase()
-                return (w.stock_items?.name || '').toLowerCase().includes(q) || (w.purpose || '').toLowerCase().includes(q)
+                return (w.item_name || w.stock_items?.name || '').toLowerCase().includes(q) || (w.purpose || '').toLowerCase().includes(q)
               }).map(w => (
                 <tr key={w.id}>
                   <td data-label="วันที่" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{fmt(w.withdrawn_at)}</td>
-                  <td data-label="สินค้า" style={{ fontWeight: 500 }}>{w.stock_items?.name || '-'}</td>
-                  <td data-label="จำนวน" style={{ textAlign: 'right', color: 'var(--danger)', fontWeight: 600 }}>-{w.quantity} {w.stock_items?.unit || ''}</td>
+                  <td data-label="สินค้า" style={{ fontWeight: 500 }}>{w.item_name || w.stock_items?.name || '-'}</td>
+                  <td data-label="จำนวน" style={{ textAlign: 'right', color: 'var(--danger)', fontWeight: 600 }}>-{w.quantity} {w.item_unit || w.stock_items?.unit || ''}</td>
                   <td data-label="เบิกเพื่อ">{w.purpose || '-'}</td>
-                  <td data-label="ผู้เบิก" style={{ fontSize: 12 }}>{w.users?.email || '-'}</td>
+                  <td data-label="ผู้เบิก" style={{ fontSize: 12 }}>{w.withdrawn_by_email || w.users?.email || '-'}</td>
                   <td data-label="จัดการ" style={{ textAlign: 'center' }}><div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
                     <button className="btn btn-sm" onClick={() => openEditWithdrawal(w)}><Pencil size={14} /></button>
                     <button className="btn btn-sm btn-danger" onClick={() => deleteWithdrawal(w.id)}><Trash2 size={14} /></button>

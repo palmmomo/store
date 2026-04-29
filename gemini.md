@@ -165,3 +165,11 @@ Files modified: jobs.go, main.go, app.go, client.ts, types/index.ts, QuotationPa
 
 Files modified: `index.css`, `JobsPage.tsx`, `QuotationPage.tsx`, `BranchesPage.tsx`, `AdminStockPage.tsx`
 
+### 2026-04-29 — Phase 2.4: Admin Stock History Fix
+
+**Bug Fixes:**
+1. **Admin Stock History** → แก้ไขปัญหาหน้า Stock ของ Admin ไม่แสดงประวัติการซื้อเข้าและการเบิกออก เนื่องจาก backend คืนค่า object ซ้อนกัน (nested relations) แล้ว frontend เข้าถึงข้อมูลไม่ครบ
+2. **Flatten Data in Backend** → ปรับแก้ `GetPurchases` และ `GetWithdrawals` ใน backend ให้ map ค่า `stock_items(name,unit)` และ `users(email)` ลงมาเป็น `item_name`, `item_unit`, `purchased_by_email` และ `withdrawn_by_email` ในระดับบนสุด (flatten) เพื่อง่ายต่อการนำไปแสดงผล
+3. **Frontend Table Rendering** → ปรับ `AdminStockPage.tsx` ให้รองรับข้อมูลที่แบนราบนี้ และอัปเดต type `StockPurchase` / `StockWithdrawal` ใน `frontend/src/types/index.ts`
+
+Files modified: `backend/handlers/purchases.go`, `backend/handlers/withdrawals.go`, `frontend/src/types/index.ts`, `frontend/src/pages/AdminStockPage.tsx`
