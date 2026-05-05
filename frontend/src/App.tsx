@@ -17,7 +17,7 @@ function ProtectedLayout() {
   if (isLoading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}><p style={{ color: 'var(--text-muted)' }}>กำลังโหลด...</p></div>
   if (!user) return <Navigate to="/login" replace />
 
-  const defaultPath = user.role === 'admin' ? '/dashboard' : user.role === 'accountant' ? '/purchase' : '/withdraw'
+  const defaultPath = user.role === 'admin' ? '/dashboard' : user.role === 'accountant' ? '/purchase' : user.role === 'designer' ? '/jobs' : '/withdraw'
   const isAdmin = user.role === 'admin'
   const isAccountant = user.role === 'accountant'
   const isTechnician = user.role === 'technician'

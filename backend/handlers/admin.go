@@ -52,10 +52,9 @@ func UpdateUserRole(c *gin.Context) {
 		return
 	}
 
-	// Validate role
-	validRoles := map[string]bool{"admin": true, "accountant": true, "technician": true}
+	validRoles := map[string]bool{"admin": true, "accountant": true, "technician": true, "designer": true}
 	if !validRoles[req.Role] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "role must be admin, accountant, or technician"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "role must be admin, accountant, technician, or designer"})
 		return
 	}
 
@@ -113,10 +112,9 @@ func CreateUser(c *gin.Context) {
 		req.Role = "technician"
 	}
 
-	// Validate role
-	validRoles := map[string]bool{"admin": true, "accountant": true, "technician": true}
+	validRoles := map[string]bool{"admin": true, "accountant": true, "technician": true, "designer": true}
 	if !validRoles[req.Role] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "role must be admin, accountant, or technician"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "role must be admin, accountant, technician, or designer"})
 		return
 	}
 

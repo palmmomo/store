@@ -1,7 +1,7 @@
 export interface User {
   id: string
   email: string
-  role: 'admin' | 'accountant' | 'technician'
+  role: 'admin' | 'accountant' | 'technician' | 'designer'
 }
 
 export interface StockItem {

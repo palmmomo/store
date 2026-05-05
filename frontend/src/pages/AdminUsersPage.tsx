@@ -14,12 +14,14 @@ const roleLabels: Record<string, string> = {
   admin: 'Admin (ผู้ดูแล)',
   accountant: 'Accountant (บัญชี)',
   technician: 'Technician (ช่าง)',
+  designer: 'Designer (ช่างออกแบบ)',
 }
 
 const roleBadgeColors: Record<string, string> = {
   admin: '#6366f1',
   accountant: '#0ea5e9',
   technician: '#f59e0b',
+  designer: '#ec4899',
 }
 
 export default function AdminUsersPage() {
@@ -200,6 +202,7 @@ export default function AdminUsersPage() {
                 <option value="admin">Admin (ผู้ดูแล)</option>
                 <option value="accountant">Accountant (บัญชี)</option>
                 <option value="technician">Technician (ช่าง)</option>
+                <option value="designer">Designer (ช่างออกแบบ)</option>
               </select>
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>
@@ -228,6 +231,7 @@ export default function AdminUsersPage() {
                 <option value="admin">Admin (ผู้ดูแล)</option>
                 <option value="accountant">Accountant (บัญชี)</option>
                 <option value="technician">Technician (ช่าง)</option>
+                <option value="designer">Designer (ช่างออกแบบ)</option>
               </select>
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}>

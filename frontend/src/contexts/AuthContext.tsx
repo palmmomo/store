@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 interface User {
   id: string
   email: string
-  role: 'admin' | 'accountant' | 'technician'
+  role: 'admin' | 'accountant' | 'technician' | 'designer'
 }
 
 interface AuthContextType {

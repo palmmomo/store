@@ -6,7 +6,7 @@ import {
   FileText, Building2, KanbanSquare, Users, Printer, LogOut, Menu, X
 } from 'lucide-react'
 
-const roleLabels: Record<string, string> = { admin: 'Admin', accountant: 'บัญชี', technician: 'ช่าง' }
+const roleLabels: Record<string, string> = { admin: 'Admin', accountant: 'บัญชี', technician: 'ช่าง', designer: 'ช่างออกแบบ' }
 
 export default function Sidebar() {
   const { user, logout } = useAuth()
@@ -44,6 +44,11 @@ export default function Sidebar() {
   } else if (user.role === 'technician') {
     mainItems.push(
       { to: '/withdraw', icon: <PackageMinus size={18} />, label: 'เบิกของ' },
+      { to: '/jobs', icon: <KanbanSquare size={18} />, label: 'การดำเนินงาน' },
+    )
+  }
+    else if (user.role === 'designer') {
+      mainItems.push(
       { to: '/jobs', icon: <KanbanSquare size={18} />, label: 'การดำเนินงาน' },
     )
   }
