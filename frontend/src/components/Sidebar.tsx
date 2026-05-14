@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Package, ShoppingCart, PackageMinus,
-  FileText, Building2, KanbanSquare, Users, Printer, LogOut, Menu, X
+  FileText, Building2, KanbanSquare, Users, Printer, LogOut, Menu, X, Palette
 } from 'lucide-react'
 
 const roleLabels: Record<string, string> = { admin: 'Admin', accountant: 'บัญชี', technician: 'ช่าง', designer: 'ช่างออกแบบ' }
@@ -29,6 +29,7 @@ export default function Sidebar() {
       { to: '/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
       { to: '/stock', icon: <Package size={18} />, label: 'Stock' },
       { to: '/quotation', icon: <FileText size={18} />, label: 'ใบเสนอราคา' },
+      { to: '/template-designer', icon: <Palette size={18} />, label: 'แบบใบเสนอราคา' },
       { to: '/jobs', icon: <KanbanSquare size={18} />, label: 'การดำเนินงาน' },
     )
     systemItems.push(
@@ -39,6 +40,7 @@ export default function Sidebar() {
     mainItems.push(
       { to: '/purchase', icon: <ShoppingCart size={18} />, label: 'ซื้อของเข้า' },
       { to: '/quotation', icon: <FileText size={18} />, label: 'ใบเสนอราคา' },
+      { to: '/template-designer', icon: <Palette size={18} />, label: 'แบบใบเสนอราคา' },
       { to: '/jobs', icon: <KanbanSquare size={18} />, label: 'การดำเนินงาน' },
     )
   } else if (user.role === 'technician') {

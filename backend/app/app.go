@@ -113,5 +113,23 @@ func InitApp() {
 			admin.DELETE("/users/:id", handlers.DeleteUser)
 			admin.GET("/history", handlers.GetHistory)
 		}
+
+		// Quote Templates (admin + accountant)
+		qt := api.Group("/quote-templates")
+		qt.Use(middleware.RequireRole("admin", "accountant"))
+		{
+			qt.GET("/:branch_id", handlers.GetQuoteTemplate)
+			qt.PUT("/:branch_id", handlers.SaveQuoteTemplate)
+		}
+
+		// Quote Drafts (admin + accountant)
+		qd := api.Group("/quote-drafts")
+		qd.Use(middleware.RequireRole("admin", "accountant"))
+		{
+			qd.GET("/:branch_id", handlers.GetQuoteDrafts)
+			qd.POST("/:branch_id", handlers.CreateQuoteDraft)
+			qd.GET("/:branch_id/:draft_id", handlers.GetQuoteDraft)
+			qd.DELETE("/:branch_id/:draft_id", handlers.DeleteQuoteDraft)
+		}
 	}
 }

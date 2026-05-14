@@ -17,25 +17,27 @@
 | Styling | Vanilla CSS (Light/White Theme + CSS Variables) |
 | Icons | Lucide React |
 | Drag & Drop | @dnd-kit/core + sortable |
+| Canvas Editor | Fabric.js (v6) |
 | PDF | jsPDF + html2canvas + thai-baht-text |
 | Backend | Golang + Gin Framework |
 | Database | Supabase (PostgreSQL + Auth) |
 | Auth | Supabase Auth (JWT) |
 | Deployment | Vercel (Frontend + Backend Serverless) |
 
-## สถานะปัจจุบัน (Session: 2026-04-29)
+## สถานะปัจจุบัน (Session: 2026-05-13)
 
 ### ✅ เสร็จแล้ว
 - Phase 1: Full refactor → Single-Shop Stock Management
 - Phase 2: Branch, Quotation (PDF), Kanban Jobs, Edit/Delete History
-- Phase 2.1: Bug fixes + Dashboard summary + Accountant stock creation + Quotation→Job flow
-- 3 Roles: admin, accountant, technician
-- 7 DB tables: users, stock_items, stock_purchases, stock_withdrawals, branches, quotations, jobs
+- Phase 2.1–2.4: Bug fixes, Mobile UX, Stock History
+- Phase 3: Quote Template Designer (Fabric.js Canvas Editor)
+- 3+ Roles: admin, accountant, technician, designer
+- 9 DB tables: users, stock_items, stock_purchases, stock_withdrawals, branches, quotations, jobs, quote_templates, quote_drafts
 - `go build ./...` ผ่าน
 - `npm run build` ผ่าน
 
 ### ⏳ ยังต้องทำต่อ
-- [ ] รัน SUPABASE_SETUP.sql ใน Supabase SQL Editor (Phase 2 + 2.1 tables)
+- [ ] รัน SUPABASE_SETUP.sql ใน Supabase SQL Editor (Phase 3 tables)
 - [ ] ทดสอบกับ backend จริง
 - [ ] Deploy ขึ้น Vercel
 
@@ -58,14 +60,17 @@
 │       ├── withdrawals.go (+ edit/delete)
 │       ├── branches.go
 │       ├── quotations.go
-│       └── jobs.go (+ price, quotation_id, dashboard summary)
+│       ├── jobs.go (+ price, quotation_id, dashboard summary)
+│       └── quote_templates.go (template + drafts CRUD)
 └── frontend/src/
     ├── api/client.ts
     ├── types/index.ts
     ├── contexts/AuthContext.tsx
     ├── App.tsx
     ├── index.css
-    ├── components/Sidebar.tsx
+    ├── components/
+    │   ├── Sidebar.tsx
+    │   └── CanvasEditor.tsx (Fabric.js canvas editor)
     └── pages/
         ├── LoginPage.tsx
         ├── AdminDashboardPage.tsx (financial summary)
@@ -75,7 +80,8 @@
         ├── QuotationPage.tsx (+ PDF html2canvas + create job)
         ├── JobsPage.tsx (Kanban + DragOverlay + price)
         ├── AccountantPurchasePage.tsx (+ add stock item)
-        └── TechnicianWithdrawPage.tsx
+        ├── TechnicianWithdrawPage.tsx
+        └── TemplateDesignerPage.tsx (canvas template designer)
 ```
 
 ## Sidebar Menu by Role
@@ -87,6 +93,7 @@
 | ซื้อของเข้า | ❌ | ✅ | ❌ |
 | เบิกของ | ❌ | ❌ | ✅ |
 | ใบเสนอราคา | ✅ | ✅ | ❌ |
+| แบบใบเสนอราคา | ✅ | ✅ | ❌ |
 | การดำเนินงาน | ✅ | ✅ | ✅ |
 | สาขา | ✅ | ❌ | ❌ |
 | จัดการผู้ใช้ | ✅ | ❌ | ❌ |
@@ -108,6 +115,10 @@ GET/POST/PUT/DELETE /api/jobs        (all)
 GET                 /api/dashboard/summary (admin)
 GET/POST/PUT/DELETE /api/admin/users (admin)
 GET                 /api/admin/history (admin)
+
+GET/PUT             /api/quote-templates/:branch_id (admin, accountant)
+GET/POST            /api/quote-drafts/:branch_id (admin, accountant)
+GET/DELETE          /api/quote-drafts/:branch_id/:draft_id (admin, accountant)
 ```
 
 ## Activity Log
@@ -173,3 +184,147 @@ Files modified: `index.css`, `JobsPage.tsx`, `QuotationPage.tsx`, `BranchesPage.
 3. **Frontend Table Rendering** → ปรับ `AdminStockPage.tsx` ให้รองรับข้อมูลที่แบนราบนี้ และอัปเดต type `StockPurchase` / `StockWithdrawal` ใน `frontend/src/types/index.ts`
 
 Files modified: `backend/handlers/purchases.go`, `backend/handlers/withdrawals.go`, `frontend/src/types/index.ts`, `frontend/src/pages/AdminStockPage.tsx`
+
+### 2026-05-13 — Phase 3: Quote Template Designer (Fabric.js)
+
+**New Feature: แบบใบเสนอราคา (Canvas-based Quote Template Designer)**
+
+1. **Fabric.js Canvas Editor** → Canvas editor แบบ Canva สำหรับออกแบบ layout ใบเสนอราคา A4 (794×1123px)
+2. **Locked Elements** → องค์ประกอบที่ลบไม่ได้ (ชื่อบริษัท, สาขา, เลขที่, วันที่, ลูกค้า, ตารางรายการ, รวมเงิน, ลายเซ็น) แต่ย้าย/ปรับสไตล์ได้
+3. **Free Elements** → ข้อความ, รูปภาพ, สี่เหลี่ยม, เส้น, วงกลม เพิ่มได้อิสระ
+4. **Per-Branch Templates** → แต่ละสาขามีแบบของตัวเอง สลับสาขาแล้วโหลดแบบเฉพาะ
+5. **Draft History** → บันทึกร่างหลายเวอร์ชัน + restore ร่างเก่าได้
+6. **PDF Export** → ส่งออก canvas เป็น PDF A4
+7. **Properties Panel** → ปรับฟอนต์, ขนาด, สี, ตัวหนา/เอียง, จัดตำแหน่งข้อความ
+8. **Undo/Redo** → Ctrl+Z / Ctrl+Y (เก็บ history 30 states)
+9. **Snap-to-Grid** → จับตำแหน่งอัตโนมัติทุก 10px
+10. **Layer Controls** → ย้ายขึ้น/ลงเลเยอร์
+
+**Database:** 2 tables ใหม่ — `quote_templates` (UNIQUE per branch) + `quote_drafts` (version history)
+
+Files created: `backend/handlers/quote_templates.go`, `frontend/src/components/CanvasEditor.tsx`, `frontend/src/pages/TemplateDesignerPage.tsx`
+Files modified: `SUPABASE_SETUP.sql`, `backend/main.go`, `backend/app/app.go`, `frontend/src/types/index.ts`, `frontend/src/api/client.ts`, `frontend/src/App.tsx`, `frontend/src/components/Sidebar.tsx`, `frontend/src/index.css`, `gemini.md`
+Dependencies added: `fabric` (Fabric.js v6)
+
+### 2026-05-13 — Phase 3.1: Template Designer Fixes
+
+**Bug Fixes:**
+1. **Backend 404** → แก้ context key จาก `userID` เป็น `user_id` ให้ตรงกับ middleware ใน `quote_templates.go`
+2. **PDF Export** → แก้ไฟล์ PDF ดาวน์โหลดได้ชื่อผิด (UUID) → ใช้ `arraybuffer` + `new Blob` กำหนด MIME type `application/pdf` + ชื่อไฟล์ ASCII-safe
+3. **Element List** → เพิ่มรายการองค์ประกอบทั้งหมดในแผง Properties ด้านขวา (คลิกเพื่อเลือก, แสดง lock/unlock, ประเภท+ชื่อ)
+4. **Shape Free Resize** → เพิ่ม `lockUniScaling: false` ให้ Rect + Circle ยืดหดอิสระ
+5. **PDF File Size** → ลด multiplier จาก 2 เป็น 1.5 ลดขนาดไฟล์
+
+Files modified: `quote_templates.go`, `CanvasEditor.tsx`, `TemplateDesignerPage.tsx`, `index.css`
+
+### 2026-05-14 — Phase 4: Quotation PDF Fix + Job System Overhaul (7 Features)
+
+**1. Fix Quotation PDF Layout:**
+- เปลี่ยน layout PDF ใบเสนอราคาให้ตรงกับ reference PDF
+- Header: ชื่อบริษัท (ตัวหนา ใหญ่), ที่อยู่, โทร, เลขผู้เสียภาษี — จัดกลาง
+- Horizontal divider ใต้ header
+- Title: "ใบเสนอราคา / QUOTATION" — จัดกลาง ตัวหนา
+- Left block: ผู้ซื้อ, ที่อยู่, เลขผู้เสียภาษี / Right block: เลขที่, วันที่
+- ตาราง bilingual (ที่/ITEM, รายการ/DESCRIPTION, จำนวน/QUANTITY, ราคา/หน่วย PRICE/UNIT, จำนวนเงิน AMOUNT/BAHT)
+- Footer row: ตัวอักษร/In Letter + รวมสุทธิ Grand Total
+- ลายเซ็น: ผู้เสนอราคา + เส้นประ + วันที่
+
+**2. Fix PDF Download (Blob approach):**
+- ใช้ `pdf.output('arraybuffer')` + `new Blob` + `URL.createObjectURL` แทน `pdf.save()` เพื่อให้ดาวน์โหลดได้ทุกกรณี
+
+**3. Remove Payment Status Color Badges:**
+- ลบ badge สีจ่ายแล้ว/มัดจำ/ไม่จ่ายออกจาก Job Cards
+- ยังเก็บข้อมูล payment_status ไว้ใน DB ไม่ลบ
+
+**4. Add Note/Memo to Job:**
+- เพิ่ม field `note` ใน jobs table (TEXT DEFAULT '')
+- เพิ่ม textarea บันทึกช่วยจำในฟอร์มสร้าง/แก้ไขงาน
+- แสดง note preview บน Job Card + modal ดู note เต็ม
+
+**5. Quotation → Auto-create Jobs (per line item):**
+- เปลี่ยน `CreateJobFromQuotation` จากสร้าง 1 งาน → สร้าง 1 งานต่อ 1 รายการ
+- ชื่องาน: `QT-XXXX: [description]`, ราคา = total ของ item นั้น
+- ทุกงาน reference กลับ quotation_id
+
+**6. Kanban / Job Board — 2 Columns:**
+- เปลี่ยนจาก 5 columns เป็น 2: **Pool งาน** (🔴 Red) + **เสร็จแล้ว** (🟢 Green)
+- Card สีพื้นหลังตามสถานะ
+- สถานะ: `pool`, `done` (แทนที่ Thai text เดิม)
+- DB constraint อัปเดต: `CHECK (status IN ('pool', 'done'))`
+
+**7. Print Receipt from Completed Job:**
+- ปุ่ม 🖨️ บน Job Card ที่สถานะ done
+- ถ้างานมาจาก multi-item quotation → receipt รวมทุกงานจาก quotation เดียวกัน
+- แต่ละแถวมีสีพื้นหลังตามสถานะ (🔴 pool / 🟢 done)
+- ลายเซ็น: ผู้รับเงิน + ผู้จ่ายเงิน
+
+**Database Changes:**
+- `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS note TEXT DEFAULT '';`
+- `ALTER TABLE jobs DROP CONSTRAINT IF EXISTS jobs_status_check;`
+- `ALTER TABLE jobs ADD CONSTRAINT jobs_status_check CHECK (status IN ('pool', 'done'));`
+
+Files modified: `QuotationPage.tsx`, `JobsPage.tsx`, `types/index.ts`, `client.ts`, `jobs.go`, `SUPABASE_SETUP.sql`, `gemini.md`
+
+### 2026-05-14 — Phase 4.1: Emoji Removal + Custom Status Text
+
+**1. ลบ Emoji ทั้งหมด → ใช้ Lucide Icons แทน:**
+- 📋 → `<FileText />` (quotation reference)
+- 📝 → `<StickyNote />` (note label)
+- ใช้ `<MessageSquare />` สำหรับ custom status text
+
+**2. เพิ่ม `status_text` — สถานะย่อยแบบพิมพ์เอง:**
+- เพิ่ม field `status_text` ใน jobs table (TEXT DEFAULT '')
+- Pool งาน + ไม่มี status_text → การ์ดสีแดง 🔴
+- Pool งาน + มี status_text (เช่น "แก้งานอยู่") → การ์ดสีเหลือง 🟡
+- เสร็จแล้ว → การ์ดสีเขียว 🟢
+- ฟิลด์ input จะแสดงเฉพาะเมื่อ status = pool
+
+Files modified: `JobsPage.tsx`, `types/index.ts`, `client.ts`, `jobs.go`, `SUPABASE_SETUP.sql`, `gemini.md`
+
+### 2026-05-14 — Phase 5: Kanban & System Overhaul
+
+**1. Dynamic Kanban Columns (Job Statuses):**
+- เพิ่มตาราง `job_statuses` และ API เพื่อให้ผู้ใช้สามารถสร้าง คอลัมน์สถานะ (เช่น สั่งพิมพ์, รอติดตั้ง) พร้อมเลือกสีประจำสถานะได้เอง
+- เลิกใช้ fixed status constraint (`pool`, `done`) ใน DB
+
+**2. Modern Kanban Redesign:**
+- รีดีไซน์หน้า Kanban เป็นการ์ดแบบใหม่ มี gradient, shadow, icon ขอบมน ให้ดูเป็นแอประดับพรีเมียม
+- สีของการ์ดจะตรงกับสีที่ผู้ใช้เลือกสำหรับสถานะนั้น
+- บังคับระบุชื่อ **ผู้รับผิดชอบ (Assignee)** ในทุกการ์ดงาน
+
+**3. Fabric.js PDF Export (Quotation):**
+- ใบเสนอราคาถูกดึงแบบมาจากตาราง `quote_templates` เพื่อเรนเดอร์ PDF แทนการใช้ HTML แบบตายตัว
+- นำข้อมูลลูกค้า, รายการสินค้า ไปวาดลง Fabric.js Canvas โดยตรงก่อนสั่ง Export เป็น PDF
+- ทำให้เลย์เอาต์ PDF ออกมาตรงตามแบบที่ตั้งค่าไว้ในหน้า "แบบใบเสนอราคา" 100%
+
+**4. Mobile Fixes:**
+- เพิ่ม Touch targets (ความสูง 44px) ให้ปุ่มและช่องกรอกข้อมูล
+- เพิ่ม Horizontal scroll ให้กับตารางและ Kanban บนมือถือ
+
+Files modified: `SUPABASE_SETUP.sql`, `backend/handlers/jobs.go`, `backend/main.go`, `frontend/src/types/index.ts`, `frontend/src/api/client.ts`, `frontend/src/pages/JobsPage.tsx`, `frontend/src/index.css`, `frontend/src/pages/QuotationPage.tsx`, `gemini.md`
+
+### 2026-05-14 — Phase 5.1: Critical Bug Fixes (Delete + Page Freeze + CORS)
+
+**1. QuotationPage Freeze (Root Cause: Static Fabric.js Import):**
+- `import { Canvas, Textbox } from 'fabric'` ที่ top-level ทำให้ Fabric.js (~1MB) โหลดทันทีตอนเปิดหน้า
+- **บล็อก main thread** ทำให้ทุกปุ่มบนหน้า QuotationPage กดไม่ได้เลย (รวมถึงปุ่มลบ, แก้ไข, PDF ฯลฯ)
+- **แก้ไข**: เปลี่ยนเป็น `const { Canvas, Textbox } = await import('fabric')` ภายในฟังก์ชัน `exportPDF()` — โหลดเฉพาะตอนกดปุ่ม PDF เท่านั้น
+
+**2. CORS Fix:**
+- เปลี่ยน CORS config จาก `AllowOrigins` เฉพาะเจาะจง → `AllowAllOrigins: true`
+- เพิ่ม `Accept` ใน AllowHeaders
+
+**3. Delete Confirmation Dialogs:**
+- ลบ Job: แสดงข้อความเตือนว่าเชื่อมกับใบเสนอราคาหรือไม่
+- ลบ Quotation: แสดงว่างานที่เชื่อมจะถูกตัด link (ON DELETE SET NULL)
+- ลบ Draft: ข้อความยืนยันสั้นๆ
+
+**4. FK Constraint Fix:**
+- `ALTER TABLE jobs ADD CONSTRAINT jobs_quotation_id_fkey ... ON DELETE SET NULL`
+- ทำให้ลบ quotation ได้โดยไม่ติด FK violation
+
+**5. Error Handling:**
+- Backend: ทุก Delete handler ส่ง error message ภาษาไทยพร้อม `err.Error()` กลับมา
+- Frontend: ทุก catch block ดึง `err.response?.data?.error` มาแสดงใน Toast
+
+Files modified: `QuotationPage.tsx`, `JobsPage.tsx`, `TemplateDesignerPage.tsx`, `main.go`, `quotations.go`, `jobs.go`, `quote_templates.go`, `SUPABASE_SETUP.sql`, `gemini.md`

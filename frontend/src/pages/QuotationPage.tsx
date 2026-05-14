@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { quotationApi, branchApi } from '../api/client'
+import { quotationApi, branchApi, quoteTemplateApi, jobApi } from '../api/client'
 import type { Quotation, QuotationItem, Branch } from '../types'
 import { FileText, Plus, Pencil, Trash2, Download, Briefcase } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ThaiBahtText from 'thai-baht-text'
-import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
+// NOTE: fabric is loaded dynamically in exportPDF() to avoid blocking the main thread
 
 const statusLabels: Record<string, string> = { draft: 'แบบร่าง', sent: 'ส่งแล้ว', approved: 'อนุมัติ' }
 const statusColors: Record<string, string> = { draft: '#94a3b8', sent: '#3b82f6', approved: '#10b981' }
@@ -17,7 +17,6 @@ export default function QuotationPage() {
   const [showModal, setShowModal] = useState(false)
   const [editQ, setEditQ] = useState<Quotation | null>(null)
   const [showCreateJobModal, setShowCreateJobModal] = useState<number | null>(null) // quotation id
-  const printRef = useRef<HTMLDivElement>(null)
   const [printQ, setPrintQ] = useState<Quotation | null>(null)
 
   const emptyItem = (): QuotationItem => ({ description: '', quantity: 1, price_per_unit: 0, total: 0 })
@@ -68,6 +67,21 @@ export default function QuotationPage() {
     setShowModal(true)
   }
 
+  const handleBranchSelect = async (bId: string) => {
+    setForm(prev => ({ ...prev, branch_id: bId }))
+    if (!bId) return
+    try {
+      const res = await quoteTemplateApi.get(parseInt(bId))
+      if (!res.data?.canvas_json) {
+        toast.error('สาขานี้ยังไม่มีแบบใบเสนอราคา กรุณาสร้างแบบก่อน', { duration: 4000 })
+      } else {
+        toast.success('ดึงแบบใบเสนอราคาของสาขาเรียบร้อย')
+      }
+    } catch {
+      toast.error('สาขานี้ยังไม่มีแบบใบเสนอราคา กรุณาสร้างแบบก่อน', { duration: 4000 })
+    }
+  }
+
   const save = async () => {
     const total = form.items.reduce((s, i) => s + (Number(i.total) || 0), 0)
     let words = ''
@@ -82,7 +96,7 @@ export default function QuotationPage() {
         const res = await quotationApi.create(payload)
         savedQ = res.data as Quotation
         toast.success('สร้างสำเร็จ')
-        // Prompt to create job
+        // Prompt to create jobs (one per line item)
         if (savedQ?.id) {
           setShowCreateJobModal(savedQ.id)
         }
@@ -95,40 +109,116 @@ export default function QuotationPage() {
   const createJobFromQuotation = async (qId: number) => {
     try {
       await quotationApi.createJob(qId)
-      toast.success('สร้างงานสำเร็จ')
+      toast.success('สร้างงานสำเร็จ (สร้างตามจำนวนรายการ)')
     } catch { toast.error('สร้างงานไม่สำเร็จ') }
     setShowCreateJobModal(null)
   }
 
-  const del = async (id: number) => {
-    if (!confirm('ลบใบเสนอราคานี้?')) return
-    try { await quotationApi.delete(id); toast.success('ลบสำเร็จ'); fetchAll() } catch (err: any) { toast.error(err.response?.data?.error || 'ลบไม่สำเร็จ') }
+  const del = async (q: Quotation) => {
+    if (!window.confirm(`ยืนยันลบใบเสนอราคา ${q.quotation_no}?\nงานที่เชื่อมอยู่จะถูกตัด link ออก (งานยังคงอยู่)`)) return
+    try { 
+      await quotationApi.delete(q.id)
+      toast.success('ลบสำเร็จ')
+      fetchAll() 
+    } catch (err: any) { 
+      toast.error(err.response?.data?.error || 'ลบไม่สำเร็จ') 
+    }
   }
 
   const exportPDF = async (q: Quotation) => {
-    setPrintQ(q)
-    // Wait for render
-    await new Promise(r => setTimeout(r, 300))
-    const el = printRef.current
-    if (!el) { toast.error('ไม่สามารถสร้าง PDF ได้'); return }
+    const loadingId = toast.loading('กำลังสร้าง PDF...')
     try {
-      const canvas = await html2canvas(el, { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' })
-      const imgData = canvas.toDataURL('image/png')
+      // Dynamic import to avoid blocking main thread on page load
+      const { Canvas, Textbox } = await import('fabric')
+
+      const res = await quoteTemplateApi.get(q.branch_id)
+      const templateJson = res.data?.canvas_json
+      
+      if (!templateJson) {
+        toast.dismiss(loadingId)
+        toast.error('ไม่พบแบบฟอร์มใบเสนอราคาสำหรับสาขานี้ กรุณาไปออกแบบที่เมนู "แบบใบเสนอราคา"')
+        return
+      }
+
+      const container = document.createElement('div')
+      container.style.position = 'absolute'
+      container.style.left = '-9999px'
+      container.style.top = '0'
+      document.body.appendChild(container)
+
+      const canvasEl = document.createElement('canvas')
+      canvasEl.width = 794
+      canvasEl.height = 1123
+      container.appendChild(canvasEl)
+
+      const fCanvas = new Canvas(canvasEl, { backgroundColor: '#ffffff' })
+      
+      // Fabric v6 loadFromJSON is async
+      await fCanvas.loadFromJSON(templateJson)
+
+      // Wait for fonts to be ready
+      await new Promise(r => setTimeout(r, 500))
+      // Inject data into Fabric.js text objects
+      const objs = fCanvas.getObjects()
+      objs.forEach((obj: any) => {
+        const lockedType = obj._lockedType
+        if (obj instanceof Textbox) {
+          if (lockedType === 'quote_number') obj.set('text', `เลขที่: ${q.quotation_no}`)
+          if (lockedType === 'date') obj.set('text', `วันที่/Date: ${fmtDate(q.date)}`)
+          if (lockedType === 'customer_info') obj.set('text', `ผู้ซื้อ/Customer: ${q.customer_name}\nที่อยู่/Address: ${q.customer_address}\nเลขผู้เสียภาษี: ${q.customer_tax_id}`)
+          if (lockedType === 'subtotal_text') {
+            obj.set('text', `ตัวอักษร/In Letter: ${ThaiBaht(q.total)}                                                   รวมสุทธิ Grand Total    ฿ ${fmtNum(q.total)}`)
+          }
+        }
+      })
+      
+      // Draw items inside table body bounds
+      const tableBodyObj = objs.find((o: any) => o._lockedType === 'table_body')
+      if (tableBodyObj) {
+        let startY = (tableBodyObj.top || 300) + 15
+        q.items.forEach((it, idx) => {
+          fCanvas.add(new Textbox(`${idx + 1}`, { left: 55, top: startY, width: 30, fontSize: 11, fontFamily: 'Sarabun, Inter, sans-serif', textAlign: 'center', fill: '#1a1a2e' }))
+          fCanvas.add(new Textbox(it.description, { left: 95, top: startY, width: 330, fontSize: 11, fontFamily: 'Sarabun, Inter, sans-serif', fill: '#1a1a2e' }))
+          fCanvas.add(new Textbox(`${it.quantity} ${it.unit}`, { left: 435, top: startY, width: 80, fontSize: 11, fontFamily: 'Sarabun, Inter, sans-serif', textAlign: 'center', fill: '#1a1a2e' }))
+          fCanvas.add(new Textbox(fmtNum(it.unit_price), { left: 525, top: startY, width: 90, fontSize: 11, fontFamily: 'Sarabun, Inter, sans-serif', textAlign: 'right', fill: '#1a1a2e' }))
+          fCanvas.add(new Textbox(fmtNum(it.quantity * it.unit_price), { left: 625, top: startY, width: 100, fontSize: 11, fontFamily: 'Sarabun, Inter, sans-serif', textAlign: 'right', fill: '#1a1a2e' }))
+          startY += 20
+        })
+      }
+      
+      fCanvas.renderAll()
+      
+      // Wait for final render flush
+      await new Promise(r => setTimeout(r, 200))
+
+      // Export logic
+      const dataUrl = fCanvas.toDataURL({ format: 'png', quality: 1, multiplier: 2 })
       const pdf = new jsPDF('p', 'mm', 'a4')
-      const pw = pdf.internal.pageSize.getWidth()
-      const ph = (canvas.height * pw) / canvas.width
-      pdf.addImage(imgData, 'PNG', 0, 0, pw, ph)
-      pdf.save(`${q.quotation_no}.pdf`)
+      pdf.addImage(dataUrl, 'PNG', 0, 0, 210, 297)
+      
+      const pdfOutput = pdf.output('arraybuffer')
+      const blob = new Blob([pdfOutput], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${q.quotation_no}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      
+      toast.dismiss(loadingId)
       toast.success('ดาวน์โหลด PDF สำเร็จ')
-    } catch { toast.error('สร้าง PDF ไม่สำเร็จ') }
-    setPrintQ(null)
+      fCanvas.dispose()
+      document.body.removeChild(container)
+    } catch (error) { 
+      toast.dismiss(loadingId)
+      toast.error('สร้าง PDF ไม่สำเร็จ') 
+    }
   }
 
   const fmtDate = (d: string) => new Date(d).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: 'numeric' })
   const fmtNum = (n: number) => n?.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'
-
-  const printBranch = printQ ? branches.find(b => b.id === printQ.branch_id) : null
-  const printItems = printQ?.items || []
   let printTotalWords = ''
   try { printTotalWords = ThaiBahtText(printQ?.total_amount || 0) } catch { printTotalWords = printQ?.total_in_words || '' }
 
@@ -157,7 +247,7 @@ export default function QuotationPage() {
                   <button className="btn btn-sm" onClick={() => exportPDF(q)} title="PDF"><Download size={14} /></button>
                   <button className="btn btn-sm" onClick={() => setShowCreateJobModal(q.id)} title="สร้างงาน"><Briefcase size={14} /></button>
                   <button className="btn btn-sm" onClick={() => openEdit(q)}><Pencil size={14} /></button>
-                  <button className="btn btn-sm btn-danger" onClick={() => del(q.id)}><Trash2 size={14} /></button>
+                  <button className="btn btn-sm btn-danger" onClick={() => del(q)}><Trash2 size={14} /></button>
                 </div></td>
               </tr>
             ))}</tbody></table>
@@ -172,7 +262,7 @@ export default function QuotationPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="form-group"><label className="form-label">สาขา</label>
-              <select className="form-input" value={form.branch_id} onChange={e => setForm({ ...form, branch_id: e.target.value })}>
+              <select className="form-input" value={form.branch_id} onChange={e => handleBranchSelect(e.target.value)}>
                 <option value="">-- เลือกสาขา --</option>
                 {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
@@ -228,7 +318,7 @@ export default function QuotationPage() {
           <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 400, textAlign: 'center' }}>
             <Briefcase size={40} style={{ color: 'var(--primary)', marginBottom: 12 }} />
             <h3 style={{ marginBottom: 8 }}>สร้างงานอัตโนมัติ</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 20 }}>ต้องการสร้างงานในการดำเนินงานจากใบเสนอราคานี้หรือไม่?</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 20 }}>ระบบจะสร้างงาน 1 งานต่อ 1 รายการในใบเสนอราคา<br />ทุกงานจะเชื่อมกลับมาที่ใบเสนอราคานี้</p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
               <button className="btn" onClick={() => setShowCreateJobModal(null)}>ไม่ใช่</button>
               <button className="btn btn-primary" onClick={() => createJobFromQuotation(showCreateJobModal)}>ใช่ — สร้างงาน</button>
@@ -237,86 +327,7 @@ export default function QuotationPage() {
         </div>
       )}
 
-      {/* Hidden print area for PDF */}
-      {printQ && (
-        <div style={{ position: 'fixed', left: '-9999px', top: 0 }}>
-          <div ref={printRef} id="quotation-print" style={{ fontFamily: "'Sarabun', sans-serif", width: 794, padding: '40px 50px', background: 'white', color: 'black', fontSize: 14, lineHeight: 1.6 }}>
-            {/* Company header */}
-            <div style={{ textAlign: 'center', marginBottom: 4 }}>
-              <div style={{ fontSize: 18, fontWeight: 700 }}>{printBranch?.name || 'บริษัท'}</div>
-              {printBranch?.address && <div style={{ fontSize: 12, color: '#444' }}>{printBranch.address}</div>}
-              <div style={{ fontSize: 12, color: '#444' }}>
-                {printBranch?.phone && `โทร. ${printBranch.phone}`}
-                {printBranch?.tax_id && ` | เลขที่ผู้เสียภาษี: ${printBranch.tax_id}`}
-              </div>
-            </div>
-            <hr style={{ border: 'none', borderTop: '2px solid #333', margin: '12px 0' }} />
-
-            <div style={{ textAlign: 'center', fontSize: 20, fontWeight: 700, margin: '10px 0' }}>ใบเสนอราคา / QUOTATION</div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', margin: '12px 0', fontSize: 13 }}>
-              <div>
-                <div><b>ผู้ซื้อ/Customer:</b> {printQ.customer_name || '-'}</div>
-                <div><b>ที่อยู่/Address:</b> {printQ.customer_address || '-'}</div>
-                {printQ.customer_tax_id && <div><b>เลขประจำตัวผู้เสียภาษี:</b> {printQ.customer_tax_id}</div>}
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div><b>เลขที่:</b> {printQ.quotation_no}</div>
-                <div><b>วันที่/Date:</b> {new Date(printQ.created_at).toLocaleDateString('th-TH', { day: '2-digit', month: 'long', year: 'numeric' })}</div>
-              </div>
-            </div>
-
-            {/* Items table */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 16, fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: '#f0f0f0' }}>
-                  <th style={{ border: '1px solid #999', padding: '6px 8px', width: 40, textAlign: 'center' }}>ที่<br /><span style={{ fontSize: 10 }}>Item</span></th>
-                  <th style={{ border: '1px solid #999', padding: '6px 8px', textAlign: 'left' }}>รายการ<br /><span style={{ fontSize: 10 }}>Description</span></th>
-                  <th style={{ border: '1px solid #999', padding: '6px 8px', width: 70, textAlign: 'center' }}>จำนวน<br /><span style={{ fontSize: 10 }}>Quantity</span></th>
-                  <th style={{ border: '1px solid #999', padding: '6px 8px', width: 90, textAlign: 'right' }}>ราคา/หน่วย<br /><span style={{ fontSize: 10 }}>Price/Unit</span></th>
-                  <th style={{ border: '1px solid #999', padding: '6px 8px', width: 100, textAlign: 'right' }}>จำนวนเงิน<br /><span style={{ fontSize: 10 }}>Amount/Baht</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                {printItems.map((item, idx) => (
-                  <tr key={idx}>
-                    <td style={{ border: '1px solid #999', padding: '5px 8px', textAlign: 'center' }}>{idx + 1}</td>
-                    <td style={{ border: '1px solid #999', padding: '5px 8px' }}>{item.description || '-'}</td>
-                    <td style={{ border: '1px solid #999', padding: '5px 8px', textAlign: 'center' }}>{item.quantity}</td>
-                    <td style={{ border: '1px solid #999', padding: '5px 8px', textAlign: 'right' }}>{fmtNum(item.price_per_unit)}</td>
-                    <td style={{ border: '1px solid #999', padding: '5px 8px', textAlign: 'right' }}>{fmtNum(Number(item.total) || 0)}</td>
-                  </tr>
-                ))}
-                {/* Empty rows to fill */}
-                {Array.from({ length: Math.max(0, 5 - printItems.length) }).map((_, idx) => (
-                  <tr key={`empty-${idx}`}>
-                    <td style={{ border: '1px solid #999', padding: '5px 8px', height: 28 }}>&nbsp;</td>
-                    <td style={{ border: '1px solid #999', padding: '5px 8px' }}></td>
-                    <td style={{ border: '1px solid #999', padding: '5px 8px' }}></td>
-                    <td style={{ border: '1px solid #999', padding: '5px 8px' }}></td>
-                    <td style={{ border: '1px solid #999', padding: '5px 8px' }}></td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr style={{ background: '#f8f8f8' }}>
-                  <td colSpan={3} style={{ border: '1px solid #999', padding: '8px', fontSize: 12 }}>
-                    <b>ตัวอักษร/In Letter:</b> {printTotalWords}
-                  </td>
-                  <td style={{ border: '1px solid #999', padding: '8px', textAlign: 'right', fontWeight: 700 }}>รวมสุทธิ<br /><span style={{ fontSize: 10 }}>Grand Total</span></td>
-                  <td style={{ border: '1px solid #999', padding: '8px', textAlign: 'right', fontWeight: 700, fontSize: 15 }}>{fmtNum(printQ.total_amount)}</td>
-                </tr>
-              </tfoot>
-            </table>
-
-            {/* Signature */}
-            <div style={{ marginTop: 60, textAlign: 'right', paddingRight: 60 }}>
-              <div style={{ fontSize: 13 }}>ผู้เสนอราคา</div>
-              <div style={{ marginTop: 40, fontSize: 13 }}>(................................)</div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modals end here. Removed old printRef div */}
     </div>
   )
 }
