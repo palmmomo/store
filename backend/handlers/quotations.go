@@ -91,7 +91,7 @@ func UpdateQuotation(c *gin.Context) {
 func DeleteQuotation(c *gin.Context) {
 	id := c.Param("id")
 	if err := db.Client.Delete("quotations", fmt.Sprintf("id=eq.%s", id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถลบใบเสนอราคาได้ เนื่องจากกำลังถูกอ้างอิงในการดำเนินงาน (Jobs)"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("ลบใบเสนอราคาไม่สำเร็จ: %v", err)})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})

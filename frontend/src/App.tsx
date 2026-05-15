@@ -11,6 +11,7 @@ import TechnicianWithdrawPage from './pages/TechnicianWithdrawPage'
 import BranchesPage from './pages/BranchesPage'
 import QuotationPage from './pages/QuotationPage'
 import JobsPage from './pages/JobsPage'
+import TemplateDesignerPage from './pages/TemplateDesignerPage'
 
 function ProtectedLayout() {
   const { user, isLoading } = useAuth()
@@ -35,6 +36,7 @@ function ProtectedLayout() {
           <Route path="/withdraw" element={(isAdmin || isTechnician) ? <TechnicianWithdrawPage /> : <Navigate to={defaultPath} />} />
           <Route path="/quotation" element={(isAdmin || isAccountant) ? <QuotationPage /> : <Navigate to={defaultPath} />} />
           <Route path="/jobs" element={<JobsPage />} />
+          <Route path="/template-designer" element={(isAdmin || isAccountant) ? <TemplateDesignerPage /> : <Navigate to={defaultPath} />} />
           <Route path="*" element={<Navigate to={defaultPath} replace />} />
         </Routes>
       </div></div>

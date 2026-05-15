@@ -14,6 +14,7 @@ export default function TechnicianWithdrawPage() {
     item_id: '',
     quantity: '',
     purpose: '',
+    picker_name: '',
   })
 
   const fetchData = async () => {
@@ -37,12 +38,13 @@ export default function TechnicianWithdrawPage() {
   const qty = parseFloat(form.quantity) || 0
 
   const resetForm = () => {
-    setForm({ item_id: '', quantity: '', purpose: '' })
+    setForm({ item_id: '', quantity: '', purpose: '', picker_name: '' })
   }
 
   const handleSave = async () => {
     if (!form.item_id) { toast.error('กรุณาเลือกสินค้า'); return }
     if (qty <= 0) { toast.error('กรุณากรอกจำนวนที่เบิก'); return }
+    if (!form.picker_name.trim()) { toast.error('กรุณากรอกชื่อผู้เบิก'); return }
 
     if (selectedItem && qty > selectedItem.quantity) {
       toast.error(`สต็อกไม่พอ! ${selectedItem.name} คงเหลือ ${selectedItem.quantity} ${selectedItem.unit}`)
@@ -55,6 +57,7 @@ export default function TechnicianWithdrawPage() {
         item_id: parseInt(form.item_id),
         quantity: qty,
         purpose: form.purpose,
+        picker_name: form.picker_name,
       })
       toast.success('บันทึกการเบิกสำเร็จ — สต็อกลดอัตโนมัติ')
       resetForm()
@@ -143,6 +146,16 @@ export default function TechnicianWithdrawPage() {
                 จำนวนเกินสต็อก (คงเหลือ {selectedItem.quantity} {selectedItem.unit})
               </p>
             )}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">ชื่อผู้เบิก *</label>
+             <input
+              className="form-input"
+              value={form.picker_name}
+              onChange={e => setForm({ ...form, picker_name: e.target.value })}
+              
+            />
           </div>
 
           <div className="form-group">

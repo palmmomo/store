@@ -42,6 +42,7 @@ export interface StockWithdrawal {
   item_name?: string
   item_unit?: string
   withdrawn_by_email?: string
+  picker_name?: string
 }
 
 export interface Branch {
@@ -84,8 +85,35 @@ export interface Job {
   payment_status: 'unpaid' | 'deposit' | 'paid'
   price: number
   quotation_id: number | null
+  note: string
+  status_text: string
+  assignee_text: string
   assigned_to: string | null
   created_by: string
   created_at: string
   updated_at: string
+}
+
+export interface QuoteTemplate {
+  id: number
+  branch_id: number
+  canvas_json: object
+  updated_at: string
+  updated_by: string
+}
+
+export interface QuoteDraft {
+  id: number
+  branch_id: number
+  canvas_json: object
+  saved_at: string
+  saved_by: string
+  label: string
+}
+
+export interface JobStatus {
+  id: number
+  name: string
+  color: string
+  order_idx: number
 }

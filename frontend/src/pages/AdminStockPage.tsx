@@ -27,7 +27,7 @@ export default function AdminStockPage() {
   // Withdrawal edit modal
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false)
   const [editWithdrawal, setEditWithdrawal] = useState<StockWithdrawal | null>(null)
-  const [wForm, setWForm] = useState({ item_id: '', quantity: '', purpose: '' })
+  const [wForm, setWForm] = useState({ item_id: '', quantity: '', purpose: '', picker_name: '' })
 
   const fetchAll = async () => {
     try {
@@ -89,7 +89,7 @@ export default function AdminStockPage() {
   // ========== Withdrawal Edit/Delete ==========
   const openEditWithdrawal = (w: StockWithdrawal) => {
     setEditWithdrawal(w)
-    setWForm({ item_id: String(w.item_id), quantity: String(w.quantity), purpose: w.purpose || '' })
+    setWForm({ item_id: String(w.item_id), quantity: String(w.quantity), purpose: w.purpose || '', picker_name: w.picker_name || '' })
     setShowWithdrawalModal(true)
   }
   const saveWithdrawal = async () => {
@@ -220,7 +220,7 @@ export default function AdminStockPage() {
                   <td data-label="สินค้า" style={{ fontWeight: 500 }}>{w.item_name || w.stock_items?.name || '-'}</td>
                   <td data-label="จำนวน" style={{ textAlign: 'right', color: 'var(--danger)', fontWeight: 600 }}>-{w.quantity} {w.item_unit || w.stock_items?.unit || ''}</td>
                   <td data-label="เบิกเพื่อ">{w.purpose || '-'}</td>
-                  <td data-label="ผู้เบิก" style={{ fontSize: 12 }}>{w.withdrawn_by_email || w.users?.email || '-'}</td>
+                  <td data-label="ผู้เบิก" style={{ fontSize: 12 }}>{w.picker_name || '-'}<br/><span style={{ color: 'var(--text-muted)', fontSize: 10 }}>({w.withdrawn_by_email})</span></td>
                   <td data-label="จัดการ" style={{ textAlign: 'center' }}><div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
                     <button className="btn btn-sm" onClick={() => openEditWithdrawal(w)}><Pencil size={14} /></button>
                     <button className="btn btn-sm btn-danger" onClick={() => deleteWithdrawal(w.id)}><Trash2 size={14} /></button>
@@ -273,6 +273,14 @@ export default function AdminStockPage() {
             </select>
           </div>
           <div className="form-group"><label className="form-label">จำนวน</label><input className="form-input" type="number" value={wForm.quantity} onChange={e => setWForm({ ...wForm, quantity: e.target.value })} /></div>
+          <div className="form-group">
+        <label className="form-label">ชื่อผู้เบิก</label>
+        <input 
+          className="form-input" 
+          value={wForm.picker_name} 
+          onChange={e => setWForm({ ...wForm, picker_name: e.target.value })} 
+        />
+        </div>
           <div className="form-group"><label className="form-label">เบิกเพื่อ</label><textarea className="form-input" value={wForm.purpose} onChange={e => setWForm({ ...wForm, purpose: e.target.value })} rows={2} style={{ resize: 'vertical', fontFamily: 'inherit' }} /></div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}><button className="btn" onClick={() => setShowWithdrawalModal(false)}>ยกเลิก</button><button className="btn btn-primary" onClick={saveWithdrawal}>บันทึก</button></div>
         </div></div>

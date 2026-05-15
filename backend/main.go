@@ -30,15 +30,11 @@ func initApp() {
 	}
 	engine = gin.Default()
 
-	frontendURL := os.Getenv("FRONTEND_URL")
-	if frontendURL == "" {
-		frontendURL = "http://localhost:5173"
-	}
 	engine.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{frontendURL, "https://store-psi-bice.vercel.app"},
+		AllowAllOrigins:  true,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		AllowCredentials: true,
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept"},
+		ExposeHeaders:    []string{"Content-Length"},
 	}))
 
 	public := engine.Group("/api")
@@ -110,6 +106,12 @@ func initApp() {
 			jobs.DELETE("/:id", handlers.DeleteJob)
 		}
 
+		// Job Statuses
+		api.GET("/job-statuses", handlers.GetJobStatuses)
+		api.POST("/job-statuses", handlers.CreateJobStatus)
+		api.PUT("/job-statuses/:id", handlers.UpdateJobStatus)
+		api.DELETE("/job-statuses/:id", handlers.DeleteJobStatus)
+
 		// Dashboard
 		api.GET("/dashboard/summary", middleware.RequireRole("admin"), handlers.GetDashboardSummary)
 
@@ -122,6 +124,24 @@ func initApp() {
 			admin.PUT("/users/:id/role", handlers.UpdateUserRole)
 			admin.DELETE("/users/:id", handlers.DeleteUser)
 			admin.GET("/history", handlers.GetHistory)
+		}
+
+		// Quote Templates (admin + accountant)
+		qt := api.Group("/quote-templates")
+		qt.Use(middleware.RequireRole("admin", "accountant"))
+		{
+			qt.GET("/:branch_id", handlers.GetQuoteTemplate)
+			qt.PUT("/:branch_id", handlers.SaveQuoteTemplate)
+		}
+
+		// Quote Drafts (admin + accountant)
+		qd := api.Group("/quote-drafts")
+		qd.Use(middleware.RequireRole("admin", "accountant"))
+		{
+			qd.GET("/:branch_id", handlers.GetQuoteDrafts)
+			qd.POST("/:branch_id", handlers.CreateQuoteDraft)
+			qd.GET("/:branch_id/:draft_id", handlers.GetQuoteDraft)
+			qd.DELETE("/:branch_id/:draft_id", handlers.DeleteQuoteDraft)
 		}
 	}
 }

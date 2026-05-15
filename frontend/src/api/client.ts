@@ -45,8 +45,8 @@ export const purchaseApi = {
 
 export const withdrawalApi = {
   getAll: () => api.get('/withdrawals'),
-  create: (d: { item_id: number; quantity: number; purpose?: string }) => api.post('/withdrawals', d),
-  update: (id: number, d: { item_id?: number; quantity?: number; purpose?: string }) => api.put(`/withdrawals/${id}`, d),
+  create: (d: { item_id: number; quantity: number; purpose?: string; picker_name: string }) => api.post('/withdrawals', d),
+  update: (id: number, d: { item_id?: number; quantity?: number; purpose?: string; picker_name?: string }) => api.put(`/withdrawals/${id}`, d),
   delete: (id: number) => api.delete(`/withdrawals/${id}`),
 }
 
@@ -67,9 +67,16 @@ export const quotationApi = {
 
 export const jobApi = {
   getAll: () => api.get('/jobs'),
-  create: (d: { title: string; description?: string; status?: string; payment_status?: string; price?: number; assigned_to?: string; quotation_id?: number }) => api.post('/jobs', d),
-  update: (id: number, d: { title?: string; description?: string; status?: string; payment_status?: string; price?: number; assigned_to?: string }) => api.put(`/jobs/${id}`, d),
+  create: (d: { title: string; description?: string; status?: string; payment_status?: string; price?: number; assigned_to?: string; assignee_text?: string; quotation_id?: number; note?: string; status_text?: string }) => api.post('/jobs', d),
+  update: (id: number, d: { title?: string; description?: string; status?: string; payment_status?: string; price?: number; assigned_to?: string; assignee_text?: string; note?: string; status_text?: string }) => api.put(`/jobs/${id}`, d),
   delete: (id: number) => api.delete(`/jobs/${id}`),
+}
+
+export const jobStatusApi = {
+  getAll: () => api.get('/job-statuses'),
+  create: (d: { name: string; color: string; order_idx: number }) => api.post('/job-statuses', d),
+  update: (id: number, d: { name: string; color: string; order_idx: number }) => api.put(`/job-statuses/${id}`, d),
+  delete: (id: number) => api.delete(`/job-statuses/${id}`),
 }
 
 export const adminApi = {
@@ -84,4 +91,17 @@ export const dashboardApi = {
   getSummary: () => api.get('/dashboard/summary'),
 }
 
+export const quoteTemplateApi = {
+  get: (branchId: number) => api.get(`/quote-templates/${branchId}`),
+  save: (branchId: number, data: { canvas_json: object }) => api.put(`/quote-templates/${branchId}`, data),
+}
+
+export const quoteDraftApi = {
+  getAll: (branchId: number) => api.get(`/quote-drafts/${branchId}`),
+  create: (branchId: number, data: { canvas_json: object; label?: string }) => api.post(`/quote-drafts/${branchId}`, data),
+  get: (branchId: number, draftId: number) => api.get(`/quote-drafts/${branchId}/${draftId}`),
+  delete: (branchId: number, draftId: number) => api.delete(`/quote-drafts/${branchId}/${draftId}`),
+}
+
 export default api
+

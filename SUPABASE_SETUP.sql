@@ -207,7 +207,7 @@ SELECT setval(
 -- SECTION 5.1: Phase 2.1 Patches
 -- ========================================
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS price FLOAT8 DEFAULT 0;
-ALTER TABLE jobs ADD COLUMN IF NOT EXISTS quotation_id INT REFERENCES quotations(id);
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS quotation_id INT REFERENCES quotations(id) ON DELETE SET NULL;
 
 
 -- ========================================

@@ -13,9 +13,10 @@ import (
 // CreateWithdrawal records a stock withdrawal and decreases stock quantity
 func CreateWithdrawal(c *gin.Context) {
 	var req struct {
-		ItemID   int     `json:"item_id" binding:"required"`
-		Quantity float64 `json:"quantity" binding:"required,gt=0"`
-		Purpose  string  `json:"purpose"`
+		ItemID     int     `json:"item_id" binding:"required"`
+		Quantity   float64 `json:"quantity" binding:"required,gt=0"`
+		Purpose    string  `json:"purpose"`
+		PickerName string  `json:"picker_name" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -42,6 +43,7 @@ func CreateWithdrawal(c *gin.Context) {
 		"quantity":     req.Quantity,
 		"purpose":      req.Purpose,
 		"withdrawn_by": userID,
+		"picker_name":  req.PickerName,
 	}
 
 	var result []map[string]interface{}
@@ -75,9 +77,10 @@ func UpdateWithdrawal(c *gin.Context) {
 	oldItemID, _ := old["item_id"].(float64)
 
 	var req struct {
-		ItemID   int     `json:"item_id"`
-		Quantity float64 `json:"quantity"`
-		Purpose  string  `json:"purpose"`
+		ItemID     int     `json:"item_id"`
+		Quantity   float64 `json:"quantity"`
+		Purpose    string  `json:"purpose"`
+		PickerName string  `json:"picker_name"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -89,9 +92,10 @@ func UpdateWithdrawal(c *gin.Context) {
 	}
 
 	updateData := map[string]interface{}{
-		"item_id":  req.ItemID,
-		"quantity": req.Quantity,
-		"purpose":  req.Purpose,
+		"item_id":     req.ItemID,
+		"quantity":    req.Quantity,
+		"purpose":     req.Purpose,
+		"picker_name": req.PickerName,
 	}
 
 	if err := db.Client.Update("stock_withdrawals", fmt.Sprintf("id=eq.%s", id), updateData, nil); err != nil {
@@ -193,14 +197,14 @@ func GetWithdrawals(c *gin.Context) {
 				w["item_unit"] = unit
 			}
 		}
-		
+
 		// Map user email
 		if userID, ok := w["withdrawn_by"].(string); ok {
 			if email, exists := userMap[userID]; exists {
 				w["withdrawn_by_email"] = email
 			}
 		}
-		
+
 		withdrawals[i] = w
 	}
 
