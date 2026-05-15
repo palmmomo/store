@@ -46,9 +46,10 @@ type StockWithdrawal struct {
 	WithdrawnBy string    `json:"withdrawn_by"`
 	WithdrawnAt time.Time `json:"withdrawn_at"`
 	// Joined fields
-	ItemName  string `json:"item_name,omitempty"`
-	ItemUnit  string `json:"item_unit,omitempty"`
-	UserEmail string `json:"user_email,omitempty"`
+	ItemName   string `json:"item_name,omitempty"`
+	ItemUnit   string `json:"item_unit,omitempty"`
+	UserEmail  string `json:"user_email,omitempty"`
+	PickerName string `json:"picker_name,omitempty"`
 }
 
 // Request types
@@ -75,9 +76,10 @@ type CreatePurchaseRequest struct {
 }
 
 type CreateWithdrawalRequest struct {
-	ItemID   int     `json:"item_id" binding:"required"`
-	Quantity float64 `json:"quantity" binding:"required,gt=0"`
-	Purpose  string  `json:"purpose"`
+	ItemID     int     `json:"item_id" binding:"required"`
+	Quantity   float64 `json:"quantity" binding:"required,gt=0"`
+	Purpose    string  `json:"purpose"`
+	PickerName string  `json:"picker_name"`
 }
 
 type CreateUserRequest struct {

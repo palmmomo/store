@@ -45,8 +45,8 @@ export const purchaseApi = {
 
 export const withdrawalApi = {
   getAll: () => api.get('/withdrawals'),
-  create: (d: { item_id: number; quantity: number; purpose?: string }) => api.post('/withdrawals', d),
-  update: (id: number, d: { item_id?: number; quantity?: number; purpose?: string }) => api.put(`/withdrawals/${id}`, d),
+  create: (d: { item_id: number; quantity: number; purpose?: string; picker_name: string }) => api.post('/withdrawals', d),
+  update: (id: number, d: { item_id?: number; quantity?: number; purpose?: string; picker_name?: string }) => api.put(`/withdrawals/${id}`, d),
   delete: (id: number) => api.delete(`/withdrawals/${id}`),
 }
 

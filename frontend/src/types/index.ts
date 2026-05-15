@@ -42,6 +42,7 @@ export interface StockWithdrawal {
   item_name?: string
   item_unit?: string
   withdrawn_by_email?: string
+  picker_name?: string
 }
 
 export interface Branch {
