@@ -68,6 +68,7 @@ export interface Quotation {
   customer_name: string
   customer_address: string
   customer_tax_id: string
+  prepared_by?: string
   items: QuotationItem[]
   total_amount: number
   total_in_words: string

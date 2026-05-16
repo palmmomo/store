@@ -59,8 +59,8 @@ export const branchApi = {
 
 export const quotationApi = {
   getAll: () => api.get('/quotations'),
-  create: (d: { branch_id?: number; customer_name?: string; customer_address?: string; customer_tax_id?: string; items: QuotationItem[]; total_amount: number; total_in_words: string; status?: string }) => api.post('/quotations', d),
-  update: (id: number, d: { branch_id?: number; customer_name?: string; customer_address?: string; customer_tax_id?: string; items?: QuotationItem[]; total_amount?: number; total_in_words?: string; status?: string }) => api.put(`/quotations/${id}`, d),
+  create: (d: { branch_id?: number; customer_name?: string; customer_address?: string; customer_tax_id?: string; prepared_by?: string; items: QuotationItem[]; total_amount: number; total_in_words: string; status?: string }) => api.post('/quotations', d),
+  update: (id: number, d: { branch_id?: number; customer_name?: string; customer_address?: string; customer_tax_id?: string; prepared_by?: string; items?: QuotationItem[]; total_amount?: number; total_in_words?: string; status?: string }) => api.put(`/quotations/${id}`, d),
   delete: (id: number) => api.delete(`/quotations/${id}`),
   createJob: (id: number) => api.post(`/quotations/${id}/create-job`),
 }

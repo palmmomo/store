@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { quotationApi, branchApi, quoteTemplateApi, jobApi } from '../api/client'
+import { useState, useEffect, useCallback } from 'react'
+import { quotationApi, branchApi, quoteTemplateApi } from '../api/client'
 import type { Quotation, QuotationItem, Branch } from '../types'
 import { FileText, Plus, Pencil, Trash2, Download, Briefcase } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -17,11 +17,10 @@ export default function QuotationPage() {
   const [showModal, setShowModal] = useState(false)
   const [editQ, setEditQ] = useState<Quotation | null>(null)
   const [showCreateJobModal, setShowCreateJobModal] = useState<number | null>(null) // quotation id
-  const [printQ, setPrintQ] = useState<Quotation | null>(null)
 
   const emptyItem = (): QuotationItem => ({ description: '', quantity: 1, price_per_unit: 0, total: 0 })
   const [form, setForm] = useState({
-    branch_id: '', customer_name: '', customer_address: '', customer_tax_id: '', status: 'draft',
+    branch_id: '', customer_name: '', customer_address: '', customer_tax_id: '', status: 'draft', prepared_by: '',
     items: [emptyItem()] as QuotationItem[],
   })
 
@@ -58,12 +57,12 @@ export default function QuotationPage() {
 
   const openAdd = () => {
     setEditQ(null)
-    setForm({ branch_id: branches[0]?.id?.toString() || '', customer_name: '', customer_address: '', customer_tax_id: '', status: 'draft', items: [emptyItem()] })
+    setForm({ branch_id: branches[0]?.id?.toString() || '', customer_name: '', customer_address: '', customer_tax_id: '', status: 'draft', prepared_by: '', items: [emptyItem()] })
     setShowModal(true)
   }
   const openEdit = (q: Quotation) => {
     setEditQ(q)
-    setForm({ branch_id: String(q.branch_id || ''), customer_name: q.customer_name, customer_address: q.customer_address, customer_tax_id: q.customer_tax_id, status: q.status, items: q.items?.length ? q.items : [emptyItem()] })
+    setForm({ branch_id: String(q.branch_id || ''), customer_name: q.customer_name, customer_address: q.customer_address, customer_tax_id: q.customer_tax_id, status: q.status, prepared_by: q.prepared_by || '', items: q.items?.length ? q.items : [emptyItem()] })
     setShowModal(true)
   }
 
@@ -86,7 +85,7 @@ export default function QuotationPage() {
     const total = form.items.reduce((s, i) => s + (Number(i.total) || 0), 0)
     let words = ''
     try { words = ThaiBahtText(total) } catch { words = '' }
-    const payload = { branch_id: parseInt(form.branch_id) || 0, customer_name: form.customer_name, customer_address: form.customer_address, customer_tax_id: form.customer_tax_id, items: form.items, total_amount: total, total_in_words: words, status: form.status }
+    const payload = { branch_id: parseInt(form.branch_id) || 0, customer_name: form.customer_name, customer_address: form.customer_address, customer_tax_id: form.customer_tax_id, prepared_by: form.prepared_by, items: form.items, total_amount: total, total_in_words: words, status: form.status }
     try {
       let savedQ: Quotation | null = null
       if (editQ) {
@@ -164,10 +163,10 @@ export default function QuotationPage() {
         const lockedType = obj._lockedType
         if (obj instanceof Textbox) {
           if (lockedType === 'quote_number') obj.set('text', `เลขที่: ${q.quotation_no}`)
-          if (lockedType === 'date') obj.set('text', `วันที่/Date: ${fmtDate(q.date)}`)
+          if (lockedType === 'date') obj.set('text', `วันที่/Date: ${fmtDate(q.created_at)}`)
           if (lockedType === 'customer_info') obj.set('text', `ผู้ซื้อ/Customer: ${q.customer_name}\nที่อยู่/Address: ${q.customer_address}\nเลขผู้เสียภาษี: ${q.customer_tax_id}`)
           if (lockedType === 'subtotal_text') {
-            obj.set('text', `ตัวอักษร/In Letter: ${ThaiBaht(q.total)}                                                   รวมสุทธิ Grand Total    ฿ ${fmtNum(q.total)}`)
+            obj.set('text', `ตัวอักษร/In Letter: ${ThaiBahtText(q.total_amount)}                                                   รวมสุทธิ Grand Total    ฿ ${fmtNum(q.total_amount)}`)
           }
         }
       })
@@ -179,9 +178,9 @@ export default function QuotationPage() {
         q.items.forEach((it, idx) => {
           fCanvas.add(new Textbox(`${idx + 1}`, { left: 55, top: startY, width: 30, fontSize: 11, fontFamily: 'Sarabun, Inter, sans-serif', textAlign: 'center', fill: '#1a1a2e' }))
           fCanvas.add(new Textbox(it.description, { left: 95, top: startY, width: 330, fontSize: 11, fontFamily: 'Sarabun, Inter, sans-serif', fill: '#1a1a2e' }))
-          fCanvas.add(new Textbox(`${it.quantity} ${it.unit}`, { left: 435, top: startY, width: 80, fontSize: 11, fontFamily: 'Sarabun, Inter, sans-serif', textAlign: 'center', fill: '#1a1a2e' }))
-          fCanvas.add(new Textbox(fmtNum(it.unit_price), { left: 525, top: startY, width: 90, fontSize: 11, fontFamily: 'Sarabun, Inter, sans-serif', textAlign: 'right', fill: '#1a1a2e' }))
-          fCanvas.add(new Textbox(fmtNum(it.quantity * it.unit_price), { left: 625, top: startY, width: 100, fontSize: 11, fontFamily: 'Sarabun, Inter, sans-serif', textAlign: 'right', fill: '#1a1a2e' }))
+          fCanvas.add(new Textbox(`${it.quantity}`, { left: 435, top: startY, width: 80, fontSize: 11, fontFamily: 'Sarabun, Inter, sans-serif', textAlign: 'center', fill: '#1a1a2e' }))
+          fCanvas.add(new Textbox(fmtNum(it.price_per_unit), { left: 525, top: startY, width: 90, fontSize: 11, fontFamily: 'Sarabun, Inter, sans-serif', textAlign: 'right', fill: '#1a1a2e' }))
+          fCanvas.add(new Textbox(fmtNum(it.quantity * it.price_per_unit), { left: 625, top: startY, width: 100, fontSize: 11, fontFamily: 'Sarabun, Inter, sans-serif', textAlign: 'right', fill: '#1a1a2e' }))
           startY += 20
         })
       }
@@ -219,8 +218,6 @@ export default function QuotationPage() {
 
   const fmtDate = (d: string) => new Date(d).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: 'numeric' })
   const fmtNum = (n: number) => n?.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'
-  let printTotalWords = ''
-  try { printTotalWords = ThaiBahtText(printQ?.total_amount || 0) } catch { printTotalWords = printQ?.total_in_words || '' }
 
   return (
     <div>
@@ -277,6 +274,7 @@ export default function QuotationPage() {
           <div className="form-group"><label className="form-label">ชื่อลูกค้า</label><input className="form-input" value={form.customer_name} onChange={e => setForm({ ...form, customer_name: e.target.value })} /></div>
           <div className="form-group"><label className="form-label">ที่อยู่ลูกค้า</label><input className="form-input" value={form.customer_address} onChange={e => setForm({ ...form, customer_address: e.target.value })} /></div>
           <div className="form-group"><label className="form-label">เลขผู้เสียภาษีลูกค้า</label><input className="form-input" value={form.customer_tax_id} onChange={e => setForm({ ...form, customer_tax_id: e.target.value })} /></div>
+          <div className="form-group"><label className="form-label">ผู้จัดทำใบเสนอราคา</label><input className="form-input" value={form.prepared_by} onChange={e => setForm({ ...form, prepared_by: e.target.value })} /></div>
 
           <div style={{ marginTop: 16, marginBottom: 8 }}><label className="form-label">รายการสินค้า</label></div>
           <div className="table-wrapper" style={{ overflowX: 'auto' }}>
@@ -326,8 +324,6 @@ export default function QuotationPage() {
           </div>
         </div>
       )}
-
-      {/* Modals end here. Removed old printRef div */}
     </div>
   )
 }
