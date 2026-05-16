@@ -26,6 +26,7 @@ func CreateQuotation(c *gin.Context) {
 		CustomerName    string                   `json:"customer_name"`
 		CustomerAddress string                   `json:"customer_address"`
 		CustomerTaxID   string                   `json:"customer_tax_id"`
+		PreparedBy      string                   `json:"prepared_by"`
 		Items           []map[string]interface{} `json:"items"`
 		TotalAmount     float64                  `json:"total_amount"`
 		TotalInWords    string                   `json:"total_in_words"`
@@ -46,6 +47,7 @@ func CreateQuotation(c *gin.Context) {
 		"customer_tax_id": req.CustomerTaxID, "items": req.Items,
 		"total_amount": req.TotalAmount, "total_in_words": req.TotalInWords,
 		"status": req.Status, "created_by": userID,
+		"prepared_by": req.PreparedBy,
 	}
 	var result []map[string]interface{}
 	if err := db.Client.Insert("quotations", data, &result); err != nil {
@@ -66,6 +68,7 @@ func UpdateQuotation(c *gin.Context) {
 		CustomerName    string                   `json:"customer_name"`
 		CustomerAddress string                   `json:"customer_address"`
 		CustomerTaxID   string                   `json:"customer_tax_id"`
+		PreparedBy      string                   `json:"prepared_by"`
 		Items           []map[string]interface{} `json:"items"`
 		TotalAmount     float64                  `json:"total_amount"`
 		TotalInWords    string                   `json:"total_in_words"`
@@ -80,6 +83,7 @@ func UpdateQuotation(c *gin.Context) {
 		"customer_address": req.CustomerAddress, "customer_tax_id": req.CustomerTaxID,
 		"items": req.Items, "total_amount": req.TotalAmount,
 		"total_in_words": req.TotalInWords, "status": req.Status,
+		"prepared_by": req.PreparedBy,
 	}
 	if err := db.Client.Update("quotations", fmt.Sprintf("id=eq.%s", id), data, nil); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update"})
