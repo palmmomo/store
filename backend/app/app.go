@@ -103,6 +103,13 @@ func InitApp() {
 			jobs.PUT("/:id", handlers.UpdateJob)
 			jobs.DELETE("/:id", handlers.DeleteJob)
 		}
+
+		// Job Statuses
+		api.GET("/job-statuses", handlers.GetJobStatuses)
+		api.POST("/job-statuses", handlers.CreateJobStatus)
+		api.PUT("/job-statuses/:id", handlers.UpdateJobStatus)
+		api.DELETE("/job-statuses/:id", handlers.DeleteJobStatus)
+
 		api.GET("/dashboard/summary", middleware.RequireRole("admin"), handlers.GetDashboardSummary)
 		admin := api.Group("/admin")
 		admin.Use(middleware.RequireRole("admin"))
