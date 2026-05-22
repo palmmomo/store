@@ -24,20 +24,24 @@
 | Auth | Supabase Auth (JWT) |
 | Deployment | Vercel (Frontend + Backend Serverless) |
 
-## สถานะปัจจุบัน (Session: 2026-05-13)
+## สถานะปัจจุบัน (Session: 2026-05-22)
 
 ### ✅ เสร็จแล้ว
 - Phase 1: Full refactor → Single-Shop Stock Management
 - Phase 2: Branch, Quotation (PDF), Kanban Jobs, Edit/Delete History
 - Phase 2.1–2.4: Bug fixes, Mobile UX, Stock History
 - Phase 3: Quote Template Designer (Fabric.js Canvas Editor)
+- Phase 4–5.1: Quotation PDF Fix, Dynamic Kanban, Bug Fixes
+- Phase 6: Cover Images + Bill Management + Supabase Storage
 - 3+ Roles: admin, accountant, technician, designer
-- 9 DB tables: users, stock_items, stock_purchases, stock_withdrawals, branches, quotations, jobs, quote_templates, quote_drafts
+- 10 DB tables: users, stock_items, stock_purchases, stock_withdrawals, branches, quotations, jobs, quote_templates, quote_drafts, bills
+- 2 Storage buckets: task-covers (public), bill-attachments (private)
 - `go build ./...` ผ่าน
 - `npm run build` ผ่าน
 
 ### ⏳ ยังต้องทำต่อ
-- [ ] รัน SUPABASE_SETUP.sql ใน Supabase SQL Editor (Phase 3 tables)
+- [ ] รัน SUPABASE_SETUP.sql ใน Supabase SQL Editor (Section 7)
+- [ ] สร้าง Storage buckets: `task-covers` (Public) + `bill-attachments` (Private)
 - [ ] ทดสอบกับ backend จริง
 - [ ] Deploy ขึ้น Vercel
 
@@ -50,7 +54,7 @@
 ├── backend/
 │   ├── .env
 │   ├── main.go + app/app.go
-│   ├── db/supabase.go
+│   ├── db/supabase.go + db/storage.go (★ NEW)
 │   ├── middleware/auth.go
 │   ├── models/models.go
 │   └── handlers/
@@ -61,6 +65,8 @@
 │       ├── branches.go
 │       ├── quotations.go
 │       ├── jobs.go (+ price, quotation_id, dashboard summary)
+│       ├── cover_upload.go (★ NEW - job cover image upload/delete)
+│       ├── bills.go (★ NEW - bill CRUD + attachment)
 │       └── quote_templates.go (template + drafts CRUD)
 └── frontend/src/
     ├── api/client.ts
@@ -78,7 +84,8 @@
         ├── AdminUsersPage.tsx
         ├── BranchesPage.tsx
         ├── QuotationPage.tsx (+ PDF html2canvas + create job)
-        ├── JobsPage.tsx (Kanban + DragOverlay + price)
+        ├── JobsPage.tsx (Kanban + cover images + DragOverlay + price)
+        ├── BillsPage.tsx (★ NEW - bill management + attachments)
         ├── AccountantPurchasePage.tsx (+ add stock item)
         ├── TechnicianWithdrawPage.tsx
         └── TemplateDesignerPage.tsx (canvas template designer)
@@ -95,6 +102,7 @@
 | ใบเสนอราคา | ✅ | ✅ | ❌ |
 | แบบใบเสนอราคา | ✅ | ✅ | ❌ |
 | การดำเนินงาน | ✅ | ✅ | ✅ |
+| **บิล** | **✅** | **✅** | **❌** |
 | สาขา | ✅ | ❌ | ❌ |
 | จัดการผู้ใช้ | ✅ | ❌ | ❌ |
 
@@ -112,6 +120,8 @@ GET/POST/PUT/DELETE /api/branches    (admin)
 GET/POST/PUT/DELETE /api/quotations  (admin, accountant)
 POST               /api/quotations/:id/create-job (admin, accountant)
 GET/POST/PUT/DELETE /api/jobs        (all)
+POST               /api/jobs/:id/cover (all — upload cover)
+DELETE             /api/jobs/:id/cover (all — delete cover)
 GET                 /api/dashboard/summary (admin)
 GET/POST/PUT/DELETE /api/admin/users (admin)
 GET                 /api/admin/history (admin)
@@ -119,6 +129,11 @@ GET                 /api/admin/history (admin)
 GET/PUT             /api/quote-templates/:branch_id (admin, accountant)
 GET/POST            /api/quote-drafts/:branch_id (admin, accountant)
 GET/DELETE          /api/quote-drafts/:branch_id/:draft_id (admin, accountant)
+
+GET/POST/PUT/DELETE /api/bills       (admin, accountant)
+GET                 /api/bills/summary (admin, accountant)
+POST               /api/bills/:id/attachment (admin, accountant)
+GET                 /api/bills/:id/attachment (admin, accountant)
 ```
 
 ## Activity Log
@@ -328,3 +343,85 @@ Files modified: `SUPABASE_SETUP.sql`, `backend/handlers/jobs.go`, `backend/main.
 - Frontend: ทุก catch block ดึง `err.response?.data?.error` มาแสดงใน Toast
 
 Files modified: `QuotationPage.tsx`, `JobsPage.tsx`, `TemplateDesignerPage.tsx`, `main.go`, `quotations.go`, `jobs.go`, `quote_templates.go`, `SUPABASE_SETUP.sql`, `gemini.md`
+
+### 2026-05-22 — Phase 6: Cover Images + Bill Management
+
+**1. Supabase Storage Client (`backend/db/storage.go`):**
+- เพิ่ม 4 methods ใน `SupabaseClient`: `UploadFile`, `DeleteFile`, `GetPublicURL`, `GetSignedURL`
+- รองรับ `x-upsert: true` สำหรับ overwrite ไฟล์ที่มีอยู่
+- Signed URL ใช้สำหรับ private buckets (bill-attachments)
+
+**2. Job Cover Image (`backend/handlers/cover_upload.go`):**
+- `POST /api/jobs/:id/cover` — อัปโหลดรูปปกงาน (JPEG, PNG, WebP, GIF, max 5MB)
+- `DELETE /api/jobs/:id/cover` — ลบรูปปก
+- เก็บใน bucket `task-covers` path `jobs/{id}/cover.{ext}`
+- อัปเดต field `cover_image_url` ในตาราง jobs
+
+**3. Bill Management (`backend/handlers/bills.go`):**
+- `GET /api/bills` — ดูรายการบิล (filter: ?month=YYYY-MM&category=xxx)
+- `GET /api/bills/summary` — สรุปยอดรายเดือน/หมวดหมู่ (?year=YYYY)
+- `POST /api/bills` — สร้างบิล (multipart form + optional attachment)
+- `PUT /api/bills/:id` — แก้ไขบิล (JSON body)
+- `DELETE /api/bills/:id` — ลบบิล + ลบไฟล์แนบจาก Storage
+- `POST /api/bills/:id/attachment` — อัปโหลด/เปลี่ยนไฟล์แนบ (JPEG, PNG, WebP, PDF, max 10MB)
+- `GET /api/bills/:id/attachment` — ดึง signed URL ของไฟล์แนบ (1 ชม.)
+- เก็บใน bucket `bill-attachments` path `{user_id}/{bill_id}/{filename}`
+
+**4. Route Registration:**
+- เพิ่ม `MaxMultipartMemory = 10 << 20` ใน engine config
+- เพิ่ม cover routes ใน jobs group
+- เพิ่ม bills group (admin + accountant) พร้อม `/summary` ก่อน `/:id`
+
+**5. Frontend — Cover Image (JobsPage.tsx):**
+- แสดง thumbnail รูป cover ด้านบนของการ์ด (100px height, object-fit cover)
+- คลิกที่ thumbnail → เปิด lightbox ดูรูปขนาดเต็ม
+- อัปโหลด cover ในฟอร์มเพิ่ม/แก้ไขงาน (file input + preview + ลบได้)
+- Drag & drop ยังทำงานปกติกับ cover image
+
+**6. Frontend — Bill Management (BillsPage.tsx):**
+- หน้าจัดการบิล CRUD ครบ (summary cards + category chart + filter + table)
+- Summary 3 cards: ค่าใช้จ่ายรวม, จำนวนบิล, เฉลี่ยต่อบิล
+- CSS bar chart แสดงค่าใช้จ่ายตามประเภท
+- Filter: เดือน (month picker) + ประเภท (dropdown) + ล้าง filter
+- Responsive table พร้อม hover effect
+- Drag-and-drop file upload zone (JPEG, PNG, WebP, PDF — max 10MB)
+- Attachment preview: lightbox (รูป) / new tab (PDF)
+- Category presets: ค่าไฟ, ค่าน้ำ, อุปกรณ์, ค่าขนส่ง, ค่าแรง, ค่าวัสดุ, ค่าเช่า, อื่นๆ
+
+**7. Sidebar + Routing:**
+- เพิ่มเมนู "บิล" (Receipt icon) สำหรับ Admin + Accountant
+- เพิ่ม route `/bills` ใน App.tsx
+
+**Database Changes:**
+- สร้างตาราง `bills` (UUID PK, description, amount, bill_date, category, note, user_id, attachment_url)
+- เพิ่ม column `cover_image_url` ในตาราง `jobs`
+- RLS policies for bills table
+- Storage policies for `task-covers` (public) + `bill-attachments` (private)
+- สร้าง Storage buckets: `task-covers` (Public) + `bill-attachments` (Private) ใน Dashboard
+
+Files created: `backend/db/storage.go`, `backend/handlers/cover_upload.go`, `backend/handlers/bills.go`, `frontend/src/pages/BillsPage.tsx`
+Files modified: `SUPABASE_SETUP.sql`, `backend/main.go`, `backend/app/app.go`, `frontend/src/types/index.ts`, `frontend/src/api/client.ts`, `frontend/src/pages/JobsPage.tsx`, `frontend/src/components/Sidebar.tsx`, `frontend/src/App.tsx`, `gemini.md`
+
+### 2026-05-22 — Phase 6.1: Client-side Image Compression
+
+**ปัญหา:** รูปเกิน 5MB upload ไม่ได้เพราะ bucket limit
+**แก้ไข:** เพิ่ม client-side compression ก่อน upload ทุกจุด ใช้ Canvas API (ไม่ต้อง install library)
+
+**1. Utility Function (`frontend/src/utils/compressImage.ts`):**
+- `compressImage(file, maxSizeMB, maxWidth)` → Promise<File>
+- Resize ตาม maxWidth (รักษา aspect ratio)
+- แปลงเป็น WebP format
+- ลด quality วนซ้ำจาก 0.9 ลงทีละ 0.1 จนได้ขนาดตามเป้า
+
+**2. JobsPage — Cover Image (maxSizeMB: 1, maxWidth: 1280):**
+- ลบ 5MB size limit check ออก → รูปขนาดเท่าไหร่ก็ upload ได้
+- Compress ตอนเลือกไฟล์ → preview แสดงรูปที่บีบแล้ว
+- อัปเดต label: "บีบอัดอัตโนมัติ" แทน "สูงสุด 5MB"
+
+**3. BillsPage — Bill Attachment (maxSizeMB: 2, maxWidth: 1920):**
+- รูปภาพ: compress ก่อน store (ไม่จำกัดขนาด input)
+- PDF: ยังคงจำกัด 10MB เหมือนเดิม (ไม่ compress)
+- อัปเดต label: "รูป: บีบอัดอัตโนมัติ / PDF: สูงสุด 10MB"
+
+Files created: `frontend/src/utils/compressImage.ts`
+Files modified: `frontend/src/pages/JobsPage.tsx`, `frontend/src/pages/BillsPage.tsx`, `gemini.md`

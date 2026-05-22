@@ -29,6 +29,7 @@ func InitApp() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	Engine = gin.Default()
+	Engine.MaxMultipartMemory = 10 << 20 // 10 MB max multipart form size
 
 	frontendURL := os.Getenv("FRONTEND_URL")
 	if frontendURL == "" {
@@ -102,6 +103,8 @@ func InitApp() {
 			jobs.POST("", handlers.CreateJob)
 			jobs.PUT("/:id", handlers.UpdateJob)
 			jobs.DELETE("/:id", handlers.DeleteJob)
+			jobs.POST("/:id/cover", handlers.UploadJobCover)
+			jobs.DELETE("/:id/cover", handlers.DeleteJobCover)
 		}
 
 		// Job Statuses
@@ -137,6 +140,19 @@ func InitApp() {
 			qd.POST("/:branch_id", handlers.CreateQuoteDraft)
 			qd.GET("/:branch_id/:draft_id", handlers.GetQuoteDraft)
 			qd.DELETE("/:branch_id/:draft_id", handlers.DeleteQuoteDraft)
+		}
+
+		// Bills (admin + accountant)
+		bills := api.Group("/bills")
+		bills.Use(middleware.RequireRole("admin", "accountant"))
+		{
+			bills.GET("", handlers.GetBills)
+			bills.GET("/summary", handlers.GetBillSummary)
+			bills.POST("", handlers.CreateBill)
+			bills.PUT("/:id", handlers.UpdateBill)
+			bills.DELETE("/:id", handlers.DeleteBill)
+			bills.POST("/:id/attachment", handlers.UploadBillAttachment)
+			bills.GET("/:id/attachment", handlers.GetBillAttachment)
 		}
 	}
 }

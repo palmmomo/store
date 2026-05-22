@@ -90,6 +90,7 @@ export interface Job {
   status_text: string
   assignee_text: string
   assigned_to: string | null
+  cover_image_url?: string
   created_by: string
   created_at: string
   updated_at: string
@@ -117,4 +118,24 @@ export interface JobStatus {
   name: string
   color: string
   order_idx: number
+}
+
+export interface Bill {
+  id: string
+  user_id: string
+  description: string
+  amount: number
+  bill_date: string
+  category: string
+  note?: string
+  attachment_url?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface BillSummary {
+  month: string
+  category: string
+  total: number
+  count: number
 }
