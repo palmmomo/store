@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { jobApi, jobStatusApi } from '../api/client'
 import type { Job, JobStatus } from '../types'
-import { KanbanSquare, Plus, Pencil, Trash2, GripVertical, Printer, StickyNote, X, FileText, User, Palette, MoreHorizontal } from 'lucide-react'
+import { KanbanSquare, Plus, Pencil, Trash2, GripVertical, Printer, StickyNote, X, FileText, User, Palette, MoreHorizontal, ImagePlus } from 'lucide-react'
+import { compressImage } from '../utils/compressImage'
 import toast from 'react-hot-toast'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
@@ -72,8 +73,8 @@ function SortableColumn({ col, onEdit, onDelete, children }: {
   )
 }
 
-function JobCard({ job, statuses, onEdit, onDelete, onViewNote, onPrintReceipt, isDragging }: {
-  job: Job; statuses: JobStatus[]; onEdit?: () => void; onDelete?: () => void; onViewNote?: () => void; onPrintReceipt?: () => void; isDragging?: boolean
+function JobCard({ job, statuses, onEdit, onDelete, onViewNote, onPrintReceipt, onViewCover, isDragging }: {
+  job: Job; statuses: JobStatus[]; onEdit?: () => void; onDelete?: () => void; onViewNote?: () => void; onPrintReceipt?: () => void; onViewCover?: () => void; isDragging?: boolean
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging: isSortDragging } = useSortable({ 
     id: `job-${job.id}`,
@@ -93,11 +94,28 @@ function JobCard({ job, statuses, onEdit, onDelete, onViewNote, onPrintReceipt, 
   return (
     <div ref={setNodeRef} style={{
       ...style,
-      background: '#ffffff', borderRadius: 12, padding: '16px',
+      background: '#ffffff', borderRadius: 12, overflow: 'hidden',
       border: `1px solid ${statusInfo.color}40`,
       marginBottom: 12, cursor: 'default',
       boxShadow: isDragging ? '0 10px 25px rgba(0,0,0,0.1)' : '0 2px 4px rgba(0,0,0,0.04)',
     }}>
+      {job.cover_image_url && (
+        <div
+          onClick={() => onViewCover?.()}
+          style={{
+            width: '100%', height: 100, overflow: 'hidden', cursor: 'pointer',
+            borderBottom: `1px solid ${statusInfo.color}20`,
+          }}
+        >
+          <img
+            src={job.cover_image_url}
+            alt="cover"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            loading="lazy"
+          />
+        </div>
+      )}
+      <div style={{ padding: '16px', display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
@@ -150,6 +168,7 @@ function JobCard({ job, statuses, onEdit, onDelete, onViewNote, onPrintReceipt, 
         }}>{statusInfo.name}</span>
         {job.price > 0 && <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{fmtPrice(job.price)}</span>}
       </div>
+      </div>{/* end padding div */}
     </div>
   )
 }
@@ -175,6 +194,12 @@ export default function JobsPage() {
   const [printReceiptJob, setPrintReceiptJob] = useState<Job | null>(null)
   const receiptRef = useRef<HTMLDivElement>(null)
 
+  // Cover image state
+  const [coverFile, setCoverFile] = useState<File | null>(null)
+  const [coverPreview, setCoverPreview] = useState<string | null>(null)
+  const [coverLightbox, setCoverLightbox] = useState<string | null>(null)
+  const coverInputRef = useRef<HTMLInputElement>(null)
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
@@ -197,12 +222,14 @@ export default function JobsPage() {
     setEditJob(null)
     const defaultStatus = colName || (statuses.length > 0 ? statuses[0].name : 'Pool งาน')
     setForm({ title: '', description: '', payment_status: 'unpaid', status: defaultStatus, price: '', note: '', assignee_text: '' })
+    setCoverFile(null); setCoverPreview(null)
     setShowModal(true)
   }
   
   const openEdit = (j: Job) => {
     setEditJob(j)
     setForm({ title: j.title, description: j.description, payment_status: j.payment_status, status: j.status, price: j.price > 0 ? String(j.price) : '', note: j.note || '', assignee_text: j.assignee_text || '' })
+    setCoverFile(null); setCoverPreview(j.cover_image_url || null)
     setShowModal(true)
   }
 
@@ -211,8 +238,23 @@ export default function JobsPage() {
     if (!form.assignee_text.trim()) { toast.error('กรุณาระบุผู้รับผิดชอบ'); return }
     const payload = { ...form, price: parseFloat(form.price) || 0 }
     try {
-      if (editJob) { await jobApi.update(editJob.id, payload); toast.success('แก้ไขสำเร็จ') }
-      else { await jobApi.create(payload); toast.success('เพิ่มงานสำเร็จ') }
+      let jobId: number | undefined
+      if (editJob) { 
+        await jobApi.update(editJob.id, payload); 
+        jobId = editJob.id
+        toast.success('แก้ไขสำเร็จ') 
+      } else { 
+        const res = await jobApi.create(payload)
+        const created = Array.isArray(res.data) ? res.data[0] : res.data
+        jobId = created?.id
+        toast.success('เพิ่มงานสำเร็จ') 
+      }
+      // Upload cover if file selected
+      if (coverFile && jobId) {
+        try {
+          await jobApi.uploadCover(jobId, coverFile)
+        } catch { toast.error('อัปโหลดรูป cover ไม่สำเร็จ') }
+      }
       setShowModal(false); fetchJobsAndStatuses()
     } catch { toast.error('บันทึกไม่สำเร็จ') }
   }
@@ -438,7 +480,7 @@ export default function JobsPage() {
                       </div>
                       <SortableContext items={colJobs.map(j => `job-${j.id}`)} strategy={verticalListSortingStrategy}>
                         <div style={{ minHeight: 40 }}>
-                          {colJobs.map(j => <JobCard key={j.id} job={j} statuses={statuses} onEdit={() => openEdit(j)} onDelete={() => del(j)} onViewNote={() => setShowNoteModal(j)} onPrintReceipt={() => printReceipt(j)} />)}
+                          {colJobs.map(j => <JobCard key={j.id} job={j} statuses={statuses} onEdit={() => openEdit(j)} onDelete={() => del(j)} onViewNote={() => setShowNoteModal(j)} onPrintReceipt={() => printReceipt(j)} onViewCover={() => j.cover_image_url && setCoverLightbox(j.cover_image_url)} />)}
                         </div>
                       </SortableContext>
                     </SortableColumn>
@@ -507,6 +549,50 @@ export default function JobsPage() {
           </div>
           <div className="form-group"><label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><StickyNote size={14} /> บันทึกช่วยจำ / Note</label>
             <textarea className="form-input" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} rows={3} style={{ resize: 'vertical', fontFamily: 'inherit' }} placeholder="จดบันทึกเพิ่มเติม..." />
+          </div>
+          <div className="form-group">
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}><ImagePlus size={14} /> รูปภาพ Cover</label>
+            <div
+              onClick={() => coverInputRef.current?.click()}
+              style={{
+                border: '2px dashed #d1d5db', borderRadius: 10, padding: coverPreview ? '8px' : '16px',
+                textAlign: 'center', cursor: 'pointer', background: '#fafafa', transition: 'all 0.2s',
+              }}
+            >
+              <input ref={coverInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={async e => {
+                const file = e.target.files?.[0]
+                if (file) {
+                  try {
+                    const compressed = await compressImage(file, 1, 1280)
+                    setCoverFile(compressed)
+                    const reader = new FileReader()
+                    reader.onload = (ev) => setCoverPreview(ev.target?.result as string)
+                    reader.readAsDataURL(compressed)
+                  } catch {
+                    toast.error('บีบอัดรูปไม่สำเร็จ')
+                  }
+                }
+              }} style={{ display: 'none' }} />
+              {coverPreview ? (
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  <img src={coverPreview} alt="Cover Preview" style={{ maxHeight: 100, maxWidth: '100%', borderRadius: 8, objectFit: 'contain' }} />
+                  <button onClick={(e) => {
+                    e.stopPropagation()
+                    setCoverFile(null); setCoverPreview(null)
+                    if (editJob?.cover_image_url) {
+                      jobApi.deleteCover(editJob.id).then(() => { toast.success('ลบรูป cover แล้ว'); fetchJobsAndStatuses() }).catch(() => toast.error('ลบรูปไม่สำเร็จ'))
+                    }
+                  }} style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#ef4444', color: 'white', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <X size={10} />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <ImagePlus size={20} color="#94a3b8" style={{ marginBottom: 4 }} />
+                  <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>คลิกเพื่อเลือกรูป (JPEG, PNG, WebP, GIF — บีบอัดอัตโนมัติ)</p>
+                </>
+              )}
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 24 }}><button className="btn" onClick={() => setShowModal(false)} style={{ minHeight: 44 }}>ยกเลิก</button><button className="btn btn-primary" onClick={save} style={{ minHeight: 44 }}>{editJob ? 'บันทึก' : 'เพิ่ม'}</button></div>
         </div></div>
@@ -600,6 +686,21 @@ export default function JobsPage() {
                 <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>วันที่ ................................</div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cover Image Lightbox */}
+      {coverLightbox && (
+        <div className="modal-overlay" onClick={() => setCoverLightbox(null)} style={{ background: 'rgba(0,0,0,0.85)', zIndex: 1000 }}>
+          <div onClick={e => e.stopPropagation()} style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }}>
+            <button
+              onClick={() => setCoverLightbox(null)}
+              style={{ position: 'absolute', top: -12, right: -12, width: 32, height: 32, borderRadius: '50%', background: 'white', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.2)', zIndex: 10 }}
+            >
+              <X size={16} />
+            </button>
+            <img src={coverLightbox} alt="Cover" style={{ maxWidth: '90vw', maxHeight: '85vh', borderRadius: 12, objectFit: 'contain' }} />
           </div>
         </div>
       )}

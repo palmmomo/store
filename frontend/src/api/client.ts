@@ -70,6 +70,12 @@ export const jobApi = {
   create: (d: { title: string; description?: string; status?: string; payment_status?: string; price?: number; assigned_to?: string; assignee_text?: string; quotation_id?: number; note?: string; status_text?: string }) => api.post('/jobs', d),
   update: (id: number, d: { title?: string; description?: string; status?: string; payment_status?: string; price?: number; assigned_to?: string; assignee_text?: string; note?: string; status_text?: string }) => api.put(`/jobs/${id}`, d),
   delete: (id: number) => api.delete(`/jobs/${id}`),
+  uploadCover: (id: number, file: File) => {
+    const form = new FormData()
+    form.append('cover', file)
+    return api.post(`/jobs/${id}/cover`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
+  },
+  deleteCover: (id: number) => api.delete(`/jobs/${id}/cover`),
 }
 
 export const jobStatusApi = {
@@ -101,6 +107,26 @@ export const quoteDraftApi = {
   create: (branchId: number, data: { canvas_json: object; label?: string }) => api.post(`/quote-drafts/${branchId}`, data),
   get: (branchId: number, draftId: number) => api.get(`/quote-drafts/${branchId}/${draftId}`),
   delete: (branchId: number, draftId: number) => api.delete(`/quote-drafts/${branchId}/${draftId}`),
+}
+
+export const billApi = {
+  getAll: (params?: { month?: string; category?: string }) =>
+    api.get('/bills', { params }),
+  getSummary: (params?: { year?: string }) =>
+    api.get('/bills/summary', { params }),
+  create: (data: FormData) =>
+    api.post('/bills', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  update: (id: string, d: { description?: string; amount?: number; bill_date?: string; category?: string; note?: string }) =>
+    api.put(`/bills/${id}`, d),
+  delete: (id: string) =>
+    api.delete(`/bills/${id}`),
+  uploadAttachment: (id: string, file: File) => {
+    const form = new FormData()
+    form.append('attachment', file)
+    return api.post(`/bills/${id}/attachment`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
+  },
+  getAttachmentUrl: (id: string) =>
+    api.get(`/bills/${id}/attachment`),
 }
 
 export default api

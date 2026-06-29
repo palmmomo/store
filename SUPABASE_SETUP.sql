@@ -220,3 +220,94 @@ ALTER TABLE jobs ADD COLUMN IF NOT EXISTS quotation_id INT REFERENCES quotations
 -- สำหรับ Accountant:   { "role": "accountant" }
 -- สำหรับ Technician:   { "role": "technician" }
 
+
+-- ========================================
+-- SECTION 7: Phase 6 — Cover Images + Bills
+-- ========================================
+
+-- 7.1 เพิ่ม cover_image_url ใน jobs table
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS cover_image_url TEXT;
+
+-- 7.2 ตารางบิล (Bills)
+CREATE TABLE IF NOT EXISTS bills (
+    id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id         UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    description     TEXT NOT NULL,
+    amount          DECIMAL(12, 2) NOT NULL,
+    bill_date       DATE NOT NULL,
+    category        VARCHAR(100) DEFAULT 'อื่นๆ',
+    note            TEXT,
+    attachment_url  TEXT,
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_bills_user ON bills(user_id);
+CREATE INDEX IF NOT EXISTS idx_bills_date ON bills(bill_date DESC);
+CREATE INDEX IF NOT EXISTS idx_bills_category ON bills(category);
+ALTER TABLE bills ENABLE ROW LEVEL SECURITY;
+
+-- 7.3 RLS Policies for bills
+-- (Backend ใช้ service_role key ซึ่งข้าม RLS อยู่แล้ว)
+-- Policies ด้านล่างสำหรับ client-side access (ถ้ามีในอนาคต)
+CREATE POLICY "Users can view own bills"
+ON bills FOR SELECT
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own bills"
+ON bills FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own bills"
+ON bills FOR UPDATE
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own bills"
+ON bills FOR DELETE
+USING (auth.uid() = user_id);
+
+-- 7.4 Storage Policies — task-covers (Public bucket)
+-- หมายเหตุ: ต้องสร้าง bucket 'task-covers' ใน Supabase Dashboard ก่อน
+-- Access: Public, MIME: image/jpeg, image/png, image/webp, image/gif, Max: 5MB
+
+CREATE POLICY "Public read task covers"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'task-covers');
+
+CREATE POLICY "Auth users can upload task covers"
+ON storage.objects FOR INSERT
+WITH CHECK (bucket_id = 'task-covers' AND auth.role() = 'authenticated');
+
+CREATE POLICY "Auth users can update task covers"
+ON storage.objects FOR UPDATE
+USING (bucket_id = 'task-covers' AND auth.role() = 'authenticated');
+
+CREATE POLICY "Auth users can delete task covers"
+ON storage.objects FOR DELETE
+USING (bucket_id = 'task-covers' AND auth.role() = 'authenticated');
+
+-- 7.5 Storage Policies — bill-attachments (Private bucket)
+-- หมายเหตุ: ต้องสร้าง bucket 'bill-attachments' ใน Supabase Dashboard ก่อน
+-- Access: Private, MIME: image/jpeg, image/png, image/webp, application/pdf, Max: 10MB
+
+CREATE POLICY "Users can upload bill attachments"
+ON storage.objects FOR INSERT
+WITH CHECK (
+    bucket_id = 'bill-attachments'
+    AND auth.role() = 'authenticated'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+);
+
+CREATE POLICY "Users can view own bill attachments"
+ON storage.objects FOR SELECT
+USING (
+    bucket_id = 'bill-attachments'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+);
+
+CREATE POLICY "Users can delete own bill attachments"
+ON storage.objects FOR DELETE
+USING (
+    bucket_id = 'bill-attachments'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+);
