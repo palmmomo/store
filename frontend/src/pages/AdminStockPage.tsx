@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { stockApi, purchaseApi, withdrawalApi } from '../api/client'
 import type { StockItem, StockPurchase, StockWithdrawal } from '../types'
-import { Package, Plus, Pencil, Trash2, Search, AlertTriangle, ShoppingCart, PackageMinus } from 'lucide-react'
+import { Package, Plus, Pencil, Trash2, Search, AlertTriangle, ShoppingCart, PackageMinus, RefreshCcw, Save } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 type Tab = 'stock' | 'purchases' | 'withdrawals'
@@ -19,10 +19,20 @@ export default function AdminStockPage() {
   const [editItem, setEditItem] = useState<StockItem | null>(null)
   const [stockForm, setStockForm] = useState({ name: '', unit: '', quantity: '' })
 
-  // Purchase edit modal
+  // Purchase edit/add modal
   const [showPurchaseModal, setShowPurchaseModal] = useState(false)
   const [editPurchase, setEditPurchase] = useState<StockPurchase | null>(null)
-  const [pForm, setPForm] = useState({ item_id: '', quantity: '', price_per_unit: '', total_price: '', supplier: '', note: '' })
+  const [pForm, setPForm] = useState({ 
+    item_id: '', 
+    is_new_item: false,
+    new_item_name: '',
+    new_item_unit: '',
+    quantity: '', 
+    price_per_unit: '', 
+    total_price: '', 
+    supplier: '', 
+    note: '' 
+  })
 
   // Withdrawal edit modal
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false)
@@ -63,24 +73,96 @@ export default function AdminStockPage() {
     try { await stockApi.delete(id); toast.success('ลบสำเร็จ'); fetchAll() } catch { toast.error('ลบไม่สำเร็จ') }
   }
 
-  // ========== Purchase Edit/Delete ==========
-  const openEditPurchase = (p: StockPurchase) => {
-    setEditPurchase(p)
-    setPForm({ item_id: String(p.item_id), quantity: String(p.quantity), price_per_unit: String(p.price_per_unit), total_price: String(p.total_price), supplier: p.supplier || '', note: p.note || '' })
+  // ========== Purchase CRUD ==========
+  const clearPurchaseForm = () => {
+    setPForm({ 
+      item_id: '', 
+      is_new_item: false,
+      new_item_name: '',
+      new_item_unit: '',
+      quantity: '', 
+      price_per_unit: '', 
+      total_price: '', 
+      supplier: '', 
+      note: '' 
+    })
+  }
+
+  const openAddPurchase = () => {
+    setEditPurchase(null)
+    clearPurchaseForm()
     setShowPurchaseModal(true)
   }
+
+  const openEditPurchase = (p: StockPurchase) => {
+    setEditPurchase(p)
+    setPForm({ 
+      item_id: String(p.item_id), 
+      is_new_item: false,
+      new_item_name: '',
+      new_item_unit: '',
+      quantity: String(p.quantity), 
+      price_per_unit: String(p.price_per_unit || ''), 
+      total_price: String(p.total_price || ''), 
+      supplier: p.supplier || '', 
+      note: p.note || '' 
+    })
+    setShowPurchaseModal(true)
+  }
+
   const savePurchase = async () => {
-    if (!editPurchase) return
+    if (pForm.is_new_item) {
+      if (!pForm.new_item_name.trim() || !pForm.new_item_unit.trim()) {
+        toast.error('กรุณากรอกชื่อสินค้าใหม่และหน่วย'); return
+      }
+    } else {
+      if (!pForm.item_id) { toast.error('กรุณาเลือกสินค้า'); return }
+    }
+
     const qty = parseFloat(pForm.quantity) || 0
+    if (qty <= 0) { toast.error('กรุณากรอกจำนวนที่ซื้อให้ถูกต้อง'); return }
+
     let ppu = parseFloat(pForm.price_per_unit) || 0
     let tp = parseFloat(pForm.total_price) || 0
     if (ppu > 0 && tp === 0) tp = ppu * qty
     if (tp > 0 && ppu === 0 && qty > 0) ppu = tp / qty
+
     try {
-      await purchaseApi.update(editPurchase.id, { item_id: parseInt(pForm.item_id), quantity: qty, price_per_unit: ppu, total_price: tp, supplier: pForm.supplier, note: pForm.note })
-      toast.success('แก้ไขสำเร็จ'); setShowPurchaseModal(false); fetchAll()
-    } catch { toast.error('แก้ไขไม่สำเร็จ') }
+      let currentItemId = parseInt(pForm.item_id)
+
+      if (pForm.is_new_item && !editPurchase) {
+        const resNewItem = await stockApi.create({
+          name: pForm.new_item_name.trim(),
+          unit: pForm.new_item_unit.trim(),
+          quantity: 0 
+        })
+        if (resNewItem?.data?.id) {
+          currentItemId = resNewItem.data.id
+        } else {
+          throw new Error('สร้างสินค้าใหม่ไม่สำเร็จ')
+        }
+      }
+
+      const payload = { 
+        item_id: currentItemId, 
+        quantity: qty, 
+        price_per_unit: ppu, 
+        total_price: tp, 
+        supplier: pForm.supplier, 
+        note: pForm.note 
+      }
+      
+      if (editPurchase) {
+        await purchaseApi.update(editPurchase.id, payload)
+        toast.success('แก้ไขสำเร็จ')
+      } else {
+        await purchaseApi.create(payload)
+        toast.success(pForm.is_new_item ? 'สร้างสินค้าและบันทึกซื้อเข้าสำเร็จ' : 'บันทึกการซื้อสำเร็จ')
+      }
+      setShowPurchaseModal(false); fetchAll()
+    } catch { toast.error('บันทึกไม่สำเร็จ') }
   }
+
   const deletePurchase = async (id: number) => {
     if (!confirm('ลบรายการซื้อนี้? สต็อกจะถูกปรับกลับ')) return
     try { await purchaseApi.delete(id); toast.success('ลบสำเร็จ'); fetchAll() } catch { toast.error('ลบไม่สำเร็จ') }
@@ -114,7 +196,12 @@ export default function AdminStockPage() {
           <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Package size={22} /> Stock — สต็อกสินค้า</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 2 }}>สต็อกคงเหลือ + ประวัติซื้อเข้า/เบิกออก</p>
         </div>
-        {tab === 'stock' && <button className="btn btn-primary" onClick={openAddStock}><Plus size={16} /> เพิ่มสินค้า</button>}
+        {tab === 'stock' && (
+          <button className="btn btn-primary" onClick={openAddStock}><Plus size={16} /> เพิ่มสินค้า</button>
+        )}
+        {tab === 'purchases' && (
+          <button className="btn btn-primary" onClick={openAddPurchase}><Plus size={16} /> เพิ่มรายการซื้อเข้า</button>
+        )}
       </div>
 
       {/* Tabs */}
@@ -243,24 +330,110 @@ export default function AdminStockPage() {
         </div></div>
       )}
 
-      {/* Purchase Edit Modal */}
-      {showPurchaseModal && editPurchase && (
-        <div className="modal-overlay" onClick={() => setShowPurchaseModal(false)}><div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
-          <h3 style={{ marginBottom: 20 }}>แก้ไขรายการซื้อ</h3>
-          <div className="form-group"><label className="form-label">สินค้า</label>
-            <select className="form-input" value={pForm.item_id} onChange={e => setPForm({ ...pForm, item_id: e.target.value })}>
-              {items.map(i => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
-            </select>
+      {showPurchaseModal && (
+        <div className="modal-overlay" onClick={() => setShowPurchaseModal(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 520, borderRadius: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 18, color: '#1e293b' }}>{editPurchase ? 'รายละเอียดการแก้ไขการซื้อ' : 'รายละเอียดการซื้อ'}</h3>
+              <button className="btn btn-sm" style={{ background: 'transparent', border: 'none', fontSize: 20 }} onClick={() => setShowPurchaseModal(false)}>&times;</button>
+            </div>
+            
+            <div className="form-group">
+              <label className="form-label" style={{ fontWeight: 600 }}>เลือกสินค้า *</label>
+              
+              {!pForm.is_new_item ? (
+                <>
+                  <select 
+                    className="form-input" 
+                    value={pForm.item_id} 
+                    disabled={!!editPurchase}
+                    onChange={e => setPForm({ ...pForm, item_id: e.target.value })}
+                    style={{ marginBottom: 12 }}
+                  >
+                    <option value="" disabled>-- เลือกสินค้า --</option>
+                    {items.map(i => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
+                  </select>
+
+                  {!editPurchase && (
+                    <button 
+                      type="button"
+                      className="btn" 
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569', borderRadius: 6 }}
+                      onClick={() => setPForm({ ...pForm, is_new_item: true, item_id: '' })}
+                    >
+                      <Plus size={16} /> เพิ่มสินค้าใหม่
+                    </button>
+                  )}
+                </>
+              ) : (
+                <div style={{ background: '#f8fafc', padding: '16px', borderRadius: 8, border: '1px dashed #cbd5e1' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#334155' }}>ข้อมูลสินค้าใหม่</span>
+                    <button 
+                      type="button"
+                      className="btn btn-sm" 
+                      style={{ fontSize: 13, color: 'var(--danger)', background: 'transparent', border: 'none', padding: 0 }}
+                      onClick={() => setPForm({ ...pForm, is_new_item: false, new_item_name: '', new_item_unit: '' })}
+                    >
+                      ยกเลิกเพิ่มสินค้า
+                    </button>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontSize: 13 }}>ชื่อสินค้า *</label>
+                    <input className="form-input" value={pForm.new_item_name} onChange={e => setPForm({ ...pForm, new_item_name: e.target.value })} placeholder="เช่น กระดาษโฟโต้ A4" autoFocus />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" style={{ fontSize: 13 }}>หน่วย *</label>
+                    <input className="form-input" value={pForm.new_item_unit} onChange={e => setPForm({ ...pForm, new_item_unit: e.target.value })} placeholder="เช่น แพ็ค, กล่อง, ชิ้น" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" style={{ fontWeight: 600 }}>จำนวนที่ซื้อ *</label>
+              <input className="form-input" type="number" value={pForm.quantity} onChange={e => setPForm({ ...pForm, quantity: e.target.value })} placeholder="0" />
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 600 }}>ราคาต่อหน่วย</label>
+                <input className="form-input" type="number" value={pForm.price_per_unit} onChange={e => setPForm({ ...pForm, price_per_unit: e.target.value, total_price: '' })} placeholder="0.00" />
+              </div>
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 600 }}>ราคารวมทั้งล็อต</label>
+                <input className="form-input" type="number" value={pForm.total_price} onChange={e => setPForm({ ...pForm, total_price: e.target.value, price_per_unit: '' })} placeholder="0.00" />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" style={{ fontWeight: 600 }}>ร้านที่ซื้อ</label>
+              <input className="form-input" value={pForm.supplier} onChange={e => setPForm({ ...pForm, supplier: e.target.value })} placeholder="ชื่อร้าน / ร้านค้า" />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" style={{ fontWeight: 600 }}>หมายเหตุ</label>
+              <input className="form-input" value={pForm.note} onChange={e => setPForm({ ...pForm, note: e.target.value })} placeholder="หมายเหตุเพิ่มเติม (ถ้ามี)" />
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+              <button 
+                className="btn" 
+                onClick={clearPurchaseForm} 
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f1f5f9', border: '1px solid #e2e8f0', flex: 1, justifyContent: 'center' }}
+              >
+                <RefreshCcw size={16} /> ล้าง
+              </button>
+              <button 
+                className="btn btn-primary" 
+                onClick={savePurchase} 
+                style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 3, justifyContent: 'center', background: '#6366f1', borderColor: '#6366f1' }}
+              >
+                <Save size={16} /> บันทึกการซื้อ
+              </button>
+            </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div className="form-group"><label className="form-label">จำนวน</label><input className="form-input" type="number" value={pForm.quantity} onChange={e => setPForm({ ...pForm, quantity: e.target.value })} /></div>
-            <div className="form-group"><label className="form-label">ราคา/หน่วย</label><input className="form-input" type="number" value={pForm.price_per_unit} onChange={e => setPForm({ ...pForm, price_per_unit: e.target.value, total_price: '' })} /></div>
-          </div>
-          <div className="form-group"><label className="form-label">ราคารวม</label><input className="form-input" type="number" value={pForm.total_price} onChange={e => setPForm({ ...pForm, total_price: e.target.value, price_per_unit: '' })} /></div>
-          <div className="form-group"><label className="form-label">ร้านค้า</label><input className="form-input" value={pForm.supplier} onChange={e => setPForm({ ...pForm, supplier: e.target.value })} /></div>
-          <div className="form-group"><label className="form-label">หมายเหตุ</label><input className="form-input" value={pForm.note} onChange={e => setPForm({ ...pForm, note: e.target.value })} /></div>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}><button className="btn" onClick={() => setShowPurchaseModal(false)}>ยกเลิก</button><button className="btn btn-primary" onClick={savePurchase}>บันทึก</button></div>
-        </div></div>
+        </div>
       )}
 
       {/* Withdrawal Edit Modal */}
@@ -274,13 +447,13 @@ export default function AdminStockPage() {
           </div>
           <div className="form-group"><label className="form-label">จำนวน</label><input className="form-input" type="number" value={wForm.quantity} onChange={e => setWForm({ ...wForm, quantity: e.target.value })} /></div>
           <div className="form-group">
-        <label className="form-label">ชื่อผู้เบิก</label>
-        <input 
-          className="form-input" 
-          value={wForm.picker_name} 
-          onChange={e => setWForm({ ...wForm, picker_name: e.target.value })} 
-        />
-        </div>
+            <label className="form-label">ชื่อผู้เบิก</label>
+            <input 
+              className="form-input" 
+              value={wForm.picker_name} 
+              onChange={e => setWForm({ ...wForm, picker_name: e.target.value })} 
+            />
+          </div>
           <div className="form-group"><label className="form-label">เบิกเพื่อ</label><textarea className="form-input" value={wForm.purpose} onChange={e => setWForm({ ...wForm, purpose: e.target.value })} rows={2} style={{ resize: 'vertical', fontFamily: 'inherit' }} /></div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 20 }}><button className="btn" onClick={() => setShowWithdrawalModal(false)}>ยกเลิก</button><button className="btn btn-primary" onClick={saveWithdrawal}>บันทึก</button></div>
         </div></div>
