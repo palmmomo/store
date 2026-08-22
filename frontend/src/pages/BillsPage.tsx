@@ -217,7 +217,7 @@ export default function BillsPage() {
   })() : 'ทั้งหมด'
 
   return (
-    <div style={{ background: 'linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%)', minHeight: 'calc(100vh - 60px)', margin: '-20px', padding: '20px' }}>
+    <div className="bleed-page" style={{ background: 'linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%)', minHeight: 'calc(100vh - 60px)' }}>
       {/* Header */}
       <div className="page-header" style={{ background: 'white', padding: '20px 24px', borderRadius: 16, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', marginBottom: 24 }}>
         <div>

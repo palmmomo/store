@@ -267,7 +267,7 @@ export default function AdminStockPage() {
         <div className="card">
           {purchases.length === 0 ? <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>ไม่มีประวัติ</p> : (
             <div style={{ overflowX: 'auto' }}>
-              <table className="data-table responsive-table"><thead><tr><th>วันที่</th><th>สินค้า</th><th style={{ textAlign: 'right' }}>จำนวน</th><th style={{ textAlign: 'right' }}>ราคา/หน่วย</th><th style={{ textAlign: 'right' }}>รวม</th><th>ร้าน</th><th>ผู้บันทึก</th><th>หมายเหตุ</th><th style={{ textAlign: 'center' }}>จัดการ</th></tr></thead>
+              <table className="data-table responsive-table"><thead><tr><th>วันที่</th><th>สินค้า</th><th style={{ textAlign: 'right' }}>จำนวน</th><th style={{ textAlign: 'right' }}>ราคา/หน่วย</th><th style={{ textAlign: 'right' }}>รวม</th><th>ร้าน</th><th>หมายเหตุ</th><th style={{ textAlign: 'center' }}>จัดการ</th></tr></thead>
               <tbody>{purchases.filter(p => {
                 const q = search.toLowerCase()
                 return (p.item_name || p.stock_items?.name || '').toLowerCase().includes(q) || (p.supplier || '').toLowerCase().includes(q)
@@ -279,7 +279,6 @@ export default function AdminStockPage() {
                   <td data-label="ราคา/หน่วย" style={{ textAlign: 'right' }}>{p.price_per_unit?.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
                   <td data-label="รวม" style={{ textAlign: 'right', fontWeight: 600, color: 'var(--success)' }}>฿{p.total_price?.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
                   <td data-label="ร้าน">{p.supplier || '-'}</td>
-                  <td data-label="ผู้บันทึก" style={{ fontSize: 12 }}>{p.purchased_by_email || p.users?.email || '-'}</td>
                   <td data-label="หมายเหตุ" style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.note || '-'}</td>
                   <td data-label="จัดการ" style={{ textAlign: 'center' }}><div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
                     <button className="btn btn-sm" onClick={() => openEditPurchase(p)}><Pencil size={14} /></button>
