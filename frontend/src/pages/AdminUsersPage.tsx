@@ -117,7 +117,7 @@ export default function AdminUsersPage() {
           <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>ยังไม่มีผู้ใช้ในระบบ</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table className="data-table" style={{ width: '100%' }}>
+            <table className="data-table responsive-table" style={{ width: '100%' }}>
               <thead>
                 <tr>
                   <th>#</th>
@@ -132,9 +132,9 @@ export default function AdminUsersPage() {
                   const role = u.app_metadata?.role || 'technician'
                   return (
                     <tr key={u.id}>
-                      <td style={{ color: 'var(--text-muted)', width: 40 }}>{idx + 1}</td>
-                      <td style={{ fontWeight: 500 }}>{u.email}</td>
-                      <td>
+                      <td data-label="#" style={{ color: 'var(--text-muted)', width: 40 }}>{idx + 1}</td>
+                      <td data-label="Email" style={{ fontWeight: 500, wordBreak: 'break-all' }}>{u.email}</td>
+                      <td data-label="Role">
                         <span style={{
                           display: 'inline-block', padding: '3px 10px', borderRadius: 20,
                           fontSize: 11, fontWeight: 600, color: 'white',
@@ -143,8 +143,8 @@ export default function AdminUsersPage() {
                           {roleLabels[role] || role}
                         </span>
                       </td>
-                      <td style={{ fontSize: 12 }}>{formatDate(u.created_at)}</td>
-                      <td style={{ textAlign: 'center' }}>
+                      <td data-label="สร้างเมื่อ" style={{ fontSize: 12 }}>{formatDate(u.created_at)}</td>
+                      <td data-label="จัดการ" style={{ textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
                           <button className="btn btn-sm" onClick={() => { setEditUser(u); setEditRole(role) }} title="เปลี่ยน Role">
                             <Pencil size={14} />

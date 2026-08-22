@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { jobApi, jobStatusApi } from '../api/client'
 import type { Job, JobStatus } from '../types'
-import { KanbanSquare, Plus, Pencil, Trash2, GripVertical, Printer, StickyNote, X, FileText, User, Palette, MoreHorizontal, ImagePlus } from 'lucide-react'
+import { KanbanSquare, Plus, Pencil, Trash2, GripVertical, Printer, StickyNote, X, FileText, User, Palette, MoreHorizontal, ImagePlus, MoveRight, Check } from 'lucide-react'
 import { compressImage } from '../utils/compressImage'
 import toast from 'react-hot-toast'
 import html2canvas from 'html2canvas'
@@ -24,7 +24,149 @@ const getContrastYIQ = (hexcolor: string) => {
   return (yiq >= 128) ? 'black' : 'white';
 }
 
-function SortableColumn({ col, onEdit, onDelete, children }: { 
+/** จอเล็ก = แสดงทีละสถานะ / จอใหญ่ = คานบันลากได้ */
+function useIsMobile(breakpoint = 768) {
+  const query = `(max-width: ${breakpoint}px)`
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia(query).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(query)
+    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', onChange)
+    setIsMobile(mq.matches)
+    return () => mq.removeEventListener('change', onChange)
+  }, [query])
+  return isMobile
+}
+
+const fmtPriceTH = (n: number) => `฿${n.toLocaleString('th-TH', { maximumFractionDigits: 0 })}`
+
+const primaryActionStyle: React.CSSProperties = {
+  flex: 1, minWidth: 0, minHeight: 44, borderRadius: 10, cursor: 'pointer',
+  border: '1px solid #dbe3ec', background: '#f8fafc', color: '#334155',
+  fontSize: 14, fontWeight: 700, fontFamily: 'inherit',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+}
+
+/**
+ * การ์ดงานสำหรับมือถือ — ไม่ใช้ drag & drop
+ * (บนจอสัมผัสการลากข้ามสถานะแทบทำไม่ได้ จึงใช้ปุ่ม "ย้าย" แทน)
+ */
+function MobileJobCard({ job, statusColor, onEdit, onDelete, onViewNote, onPrintReceipt, onViewCover, onMove }: {
+  job: Job; statusColor: string
+  onEdit: () => void; onDelete: () => void; onViewNote: () => void
+  /** งานที่จบแล้วจะไม่ส่ง onMove มา — ปุ่มย้ายสถานะจะไม่ขึ้น */
+  onPrintReceipt?: () => void; onViewCover: () => void; onMove?: () => void
+}) {
+  const [showMenu, setShowMenu] = useState(false)
+  const menuItemStyle = { display: 'flex', alignItems: 'center', gap: 12, width: '100%', minHeight: 52, padding: '0 14px', background: 'none', border: 'none', textAlign: 'left' as const, fontSize: 15, cursor: 'pointer', color: '#334155', fontFamily: 'inherit' }
+
+  return (
+    <div style={{
+      background: '#fff', borderRadius: 12, overflow: 'hidden',
+      border: '1px solid #e8edf3', borderLeft: `4px solid ${statusColor}`,
+      marginBottom: 12, boxShadow: '0 1px 2px rgba(15,23,42,0.05)',
+    }}>
+      {job.cover_image_url && (
+        <div onClick={onViewCover} style={{ width: '100%', height: 140, overflow: 'hidden', cursor: 'pointer' }}>
+          <img src={job.cover_image_url} alt="cover" loading="lazy"
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        </div>
+      )}
+
+      <div style={{ padding: 14 }}>
+        <div className="job-text" style={{ fontWeight: 700, fontSize: 16, color: '#0f172a', lineHeight: 1.35 }}>{job.title}</div>
+        {job.description && (
+          <div className="job-text" style={{ fontSize: 13, color: '#64748b', marginTop: 4, lineHeight: 1.45 }}>{job.description}</div>
+        )}
+
+        {(job.quotation_id || job.note) && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+            {job.quotation_id && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: '#4f46e5', background: '#eef2ff', padding: '4px 8px', borderRadius: 6 }}>
+                <FileText size={11} /> QT #{job.quotation_id}
+              </span>
+            )}
+            {job.note && (
+              <button onClick={onViewNote} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: '#b45309', background: '#fef3c7', padding: '4px 8px', borderRadius: 6, border: 'none', cursor: 'pointer', maxWidth: '100%', fontFamily: 'inherit' }}>
+                <StickyNote size={11} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{job.note}</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 12, paddingTop: 11, borderTop: '1px solid #f1f5f9' }}>
+          <span className="job-text" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#64748b' }}>
+            <User size={13} style={{ flexShrink: 0 }} /> {job.assignee_text || '—'}
+          </span>
+          {job.price > 0 && (
+            <span style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', flexShrink: 0 }}>{fmtPriceTH(job.price)}</span>
+          )}
+        </div>
+
+        {/* งานที่ยังไม่จบ: ปุ่มย้ายสถานะ / งานที่จบแล้ว: ป้ายบอกสถานะ
+            (พิมพ์ใบเสร็จอยู่ในเมนู ⋯) */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 12, position: 'relative' }}>
+          {onMove ? (
+            <button onClick={onMove} style={primaryActionStyle}>
+              <MoveRight size={16} /> ย้ายสถานะ
+            </button>
+          ) : (
+            <span style={{
+              ...primaryActionStyle,
+              cursor: 'default',
+              background: statusColor,
+              borderColor: statusColor,
+              color: getContrastYIQ(statusColor),
+            }}>
+              {job.status}
+            </span>
+          )}
+          <button onClick={() => setShowMenu(true)} aria-label="เมนู" style={{
+            width: 44, minHeight: 44, borderRadius: 10, cursor: 'pointer',
+            border: '1px solid #dbe3ec', background: '#fff', color: '#64748b',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          }}>
+            <MoreHorizontal size={18} />
+          </button>
+
+          {/* Bottom sheet — ใช้ position:fixed จึงหลุดออกจาก overflow:hidden ของการ์ด
+              เมนูแบบ absolute เดิมโดนขอบการ์ดเฉือนหัวขาด รายการบนสุดหายไป */}
+          {showMenu && (
+            <div
+              onClick={() => setShowMenu(false)}
+              style={{
+                position: 'fixed', inset: 0, zIndex: 1000,
+                background: 'rgba(15,23,42,0.35)',
+                display: 'flex', alignItems: 'flex-end',
+              }}
+            >
+              <div
+                onClick={e => e.stopPropagation()}
+                style={{
+                  width: '100%', background: '#fff',
+                  borderRadius: '16px 16px 0 0',
+                  padding: '10px 10px calc(10px + env(safe-area-inset-bottom, 0px))',
+                  boxShadow: '0 -8px 30px rgba(15,23,42,0.2)',
+                  maxHeight: '80dvh', overflowY: 'auto',
+                }}
+              >
+                <div className="job-text" style={{ padding: '8px 12px 12px', fontSize: 13, fontWeight: 700, color: '#94a3b8' }}>{job.title}</div>
+                {onPrintReceipt && <button onClick={() => { onPrintReceipt(); setShowMenu(false) }} style={menuItemStyle}><Printer size={18}/> พิมพ์ใบเสร็จ</button>}
+                {job.note && <button onClick={() => { onViewNote(); setShowMenu(false) }} style={menuItemStyle}><StickyNote size={18}/> ดูบันทึก</button>}
+                <button onClick={() => { onEdit(); setShowMenu(false) }} style={menuItemStyle}><Pencil size={18}/> แก้ไขงาน</button>
+                <button onClick={() => { onDelete(); setShowMenu(false) }} style={{ ...menuItemStyle, color: '#ef4444' }}><Trash2 size={18}/> ลบงาน</button>
+                <button onClick={() => setShowMenu(false)} style={{ ...menuItemStyle, justifyContent: 'center', marginTop: 6, background: '#f1f5f9', borderRadius: 10, fontWeight: 700, color: '#475569' }}>ยกเลิก</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SortableColumn({ col, onEdit, onDelete, children }: {
   col: JobStatus; onEdit: () => void; onDelete: () => void; children: React.ReactNode 
 }) {
   const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ 
@@ -94,7 +236,9 @@ function JobCard({ job, statuses, onEdit, onDelete, onViewNote, onPrintReceipt, 
   return (
     <div ref={setNodeRef} style={{
       ...style,
-      background: '#ffffff', borderRadius: 12, overflow: 'hidden',
+      background: '#ffffff', borderRadius: 12,
+      // ห้ามใส่ overflow:hidden ที่นี่ — จะไปเฉือนเมนู ⋯ ที่เป็น absolute จนหัวขาด
+      // ย้ายการตัดมุมไปไว้ที่กล่องรูปปกแทน
       border: `1px solid ${statusInfo.color}40`,
       marginBottom: 12, cursor: 'default',
       boxShadow: isDragging ? '0 10px 25px rgba(0,0,0,0.1)' : '0 2px 4px rgba(0,0,0,0.04)',
@@ -104,6 +248,7 @@ function JobCard({ job, statuses, onEdit, onDelete, onViewNote, onPrintReceipt, 
           onClick={() => onViewCover?.()}
           style={{
             width: '100%', height: 100, overflow: 'hidden', cursor: 'pointer',
+            borderRadius: '11px 11px 0 0',
             borderBottom: `1px solid ${statusInfo.color}20`,
           }}
         >
@@ -120,9 +265,9 @@ function JobCard({ job, statuses, onEdit, onDelete, onViewNote, onPrintReceipt, 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
             <span {...attributes} {...listeners} style={{ cursor: 'grab', color: '#94a3b8', flexShrink: 0, marginTop: 2 }}><GripVertical size={16} /></span>
-            <div>
+            <div className="job-text">
               <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b', lineHeight: 1.3 }}>{job.title}</div>
-              {job.description && <div style={{ fontSize: 12, color: '#64748b', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}><FileText size={12}/> {job.description}</div>}
+              {job.description && <div style={{ fontSize: 12, color: '#64748b', marginTop: 4, display: 'flex', alignItems: 'flex-start', gap: 4 }}><FileText size={12} style={{ flexShrink: 0, marginTop: 2 }} /> <span>{job.description}</span></div>}
             </div>
           </div>
           {job.quotation_id && (
@@ -199,6 +344,32 @@ export default function JobsPage() {
   const [coverPreview, setCoverPreview] = useState<string | null>(null)
   const [coverLightbox, setCoverLightbox] = useState<string | null>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
+
+  // ---- โหมดมือถือ: แสดงทีละสถานะ ----
+  const isMobile = useIsMobile()
+  const [mobileStatus, setMobileStatus] = useState('')
+  const [movePicker, setMovePicker] = useState<Job | null>(null)
+
+  // ถ้าสถานะที่เลือกไว้หายไป (ถูกลบ/เพิ่งโหลด) ให้เด้งกลับไปอันแรก
+  useEffect(() => {
+    if (statuses.length > 0 && !statuses.some(s => s.name === mobileStatus)) {
+      setMobileStatus(statuses[0].name)
+    }
+  }, [statuses, mobileStatus])
+
+  // ตำแหน่งคอลัมน์ที่กำลังดูอยู่ (ใช้กับจุดบอกตำแหน่งบนมือถือ)
+  const boardRef = useRef<HTMLDivElement>(null)
+  const [activeCol, setActiveCol] = useState(0)
+  const handleBoardScroll = () => {
+    const el = boardRef.current
+    if (!el) return
+    const first = el.firstElementChild as HTMLElement | null
+    if (!first) return
+    // ระยะ 1 คอลัมน์ = ความกว้างการ์ด + ช่องไฟ
+    const step = first.getBoundingClientRect().width + 20
+    if (step <= 0) return
+    setActiveCol(Math.min(statuses.length - 1, Math.max(0, Math.round(el.scrollLeft / step))))
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -402,30 +573,90 @@ export default function JobsPage() {
   }
 
   const printReceipt = async (job: Job) => {
+    const loadingId = toast.loading('กำลังสร้างใบเสร็จ...')
     setPrintReceiptJob(job)
-    await new Promise(r => setTimeout(r, 500))
-    const el = receiptRef.current
-    if (!el) { toast.error('ไม่สามารถสร้างใบเสร็จได้'); return }
     try {
-      const canvas = await html2canvas(el, { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' })
-      const imgData = canvas.toDataURL('image/png')
+      // รอให้ React วาดเทมเพลตลง DOM จริง แล้วรอฟอนต์ไทยโหลดเสร็จ
+      // (ของเดิมรอ 500ms แบบเดา ซึ่งพลาดได้ถ้าเครื่องช้า)
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(null))))
+      if (document.fonts?.ready) await document.fonts.ready
+
+      let el = receiptRef.current
+      if (!el) {
+        await new Promise(r => setTimeout(r, 400))
+        el = receiptRef.current
+      }
+      if (!el) throw new Error('ไม่พบเทมเพลตใบเสร็จ')
+
+      const width = el.scrollWidth || 794
+      const height = el.scrollHeight
+      if (!height) throw new Error('เทมเพลตใบเสร็จยังไม่มีเนื้อหา')
+
+      // Safari/iOS จำกัดขนาด canvas (~4096px ต่อด้าน) ถ้าเกิน getContext('2d')
+      // จะคืน null แล้วพังเป็น "undefined is not an object (evaluating 'e.clearRect')"
+      const scale = Math.max(1, Math.min(2, 4096 / Math.max(width, height)))
+
+      const canvas = await Promise.race([
+        html2canvas(el, {
+          scale,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+          width,
+          height,
+          // สำคัญบนมือถือ: ถ้าไม่กำหนด html2canvas จะจัดเลย์เอาต์ตามความกว้างจอ (เช่น 430px)
+          // ใบเสร็จกว้าง 794px จึงถูกบีบ/ตัด หรือออกมาว่างเปล่า
+          windowWidth: width,
+          windowHeight: height,
+          scrollX: 0,
+          scrollY: 0,
+          // html2canvas โคลนทั้งหน้าเสมอ ไม่ใช่แค่ element ที่ส่งให้
+          // หน้านี้มีการ์ด 60+ ใบพร้อมรูปปกจาก Supabase มันจึงรอโหลดรูปทั้งหมด
+          // ตัดทิ้งไปเลย เพราะไม่ได้อยู่ในใบเสร็จ
+          ignoreElements: (el) => el.hasAttribute?.('data-h2c-skip'),
+          // เปิดให้มองเห็นเฉพาะในสำเนา หน้าจอจริงไม่กระพริบ
+          onclone: (doc) => {
+            const root = doc.getElementById('receipt-root')
+            if (root) {
+              root.style.visibility = 'visible'
+              root.style.zIndex = '0'
+            }
+          },
+        }),
+        // กันค้างเงียบๆ — เดิมถ้า html2canvas ไม่ยอมจบ toast จะหมุนตลอดกาล
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('ใช้เวลานานเกินไป (เกิน 20 วินาที)')), 20000)
+        ),
+      ])
+
+      if (!canvas.width || !canvas.height) throw new Error('เรนเดอร์ใบเสร็จออกมาว่างเปล่า')
+
       const pdf = new jsPDF('p', 'mm', 'a4')
       const pw = pdf.internal.pageSize.getWidth()
       const ph = (canvas.height * pw) / canvas.width
-      pdf.addImage(imgData, 'PNG', 0, 0, pw, ph)
-      const pdfOutput = pdf.output('arraybuffer')
-      const blob = new Blob([pdfOutput], { type: 'application/pdf' })
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pw, ph)
+
+      const blob = new Blob([pdf.output('arraybuffer')], { type: 'application/pdf' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
       a.download = `receipt-job-${job.id}.pdf`
+      a.rel = 'noopener'
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
-      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+      toast.dismiss(loadingId)
       toast.success('ดาวน์โหลดใบเสร็จสำเร็จ')
-    } catch { toast.error('สร้างใบเสร็จไม่สำเร็จ') }
-    setPrintReceiptJob(null)
+    } catch (err) {
+      // เดิม catch เปล่าๆ กลืน error ทิ้ง เลยไล่หาสาเหตุไม่ได้เลย
+      console.error('printReceipt failed:', err)
+      toast.dismiss(loadingId)
+      toast.error(`สร้างใบเสร็จไม่สำเร็จ: ${err instanceof Error ? err.message : 'ไม่ทราบสาเหตุ'}`)
+    } finally {
+      // เดิมถ้า return ก่อน จะไม่เคลียร์ ทำให้เทมเพลตค้างใน DOM
+      setPrintReceiptJob(null)
+    }
   }
 
   const getRelatedJobs = (job: Job): Job[] => {
@@ -438,7 +669,7 @@ export default function JobsPage() {
   const receiptTotal = receiptJobs.reduce((s, j) => s + (j.price || 0), 0)
 
   return (
-    <div style={{ background: 'linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%)', minHeight: 'calc(100vh - 60px)', paddingBottom: 40, margin: '-20px', padding: '20px' }}>
+    <div className="bleed-page" style={{ background: 'linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%)', minHeight: 'calc(100vh - 60px)' }}>
       <div className="page-header" style={{ background: 'white', padding: '20px 24px', borderRadius: 16, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', marginBottom: 24 }}>
         <div>
           <h2 style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 24, color: '#1e293b' }}>
@@ -450,25 +681,112 @@ export default function JobsPage() {
           <button className="btn" onClick={openAddStatus} style={{ background: '#f1f5f9', color: '#475569', border: '1px solid #e2e8f0' }}>
             <Plus size={16} /> คอลัมน์สถานะ
           </button>
-          <button className="btn btn-primary" onClick={() => openAdd()} style={{ background: '#6366f1', border: 'none', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)' }}>
+          <button className="btn btn-primary" onClick={() => openAdd(isMobile ? mobileStatus : undefined)} style={{ background: '#6366f1', border: 'none', boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)' }}>
             <Plus size={16} /> เพิ่มงาน
           </button>
         </div>
       </div>
 
-      {loading ? <div className="card"><p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>กำลังโหลด...</p></div> : (
-        <DndContext 
-          sensors={sensors} 
-          collisionDetection={closestCorners} 
-          onDragStart={handleDragStart} 
+      {loading ? <div className="card"><p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>กำลังโหลด...</p></div> : isMobile ? (
+        /* ============ มือถือ: แสดงทีละสถานะ ============ */
+        (() => {
+          const cur = statuses.find(s => s.name === mobileStatus)
+          const curJobs = jobs.filter(j => j.status === mobileStatus)
+          const curTotal = curJobs.reduce((s, j) => s + (j.price || 0), 0)
+          const isFinal = statuses.length > 0 && statuses[statuses.length - 1].name === mobileStatus
+          return (
+            <div data-h2c-skip>
+              {/* แถบเลือกสถานะ — แบ่งช่องเท่ากันเต็มความกว้างจอ ไม่ต้องเลื่อน */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${Math.max(statuses.length, 1)}, minmax(0, 1fr))`,
+                width: '100%',
+                border: '1px solid #dbe3ec',
+                borderRadius: 8,
+                overflow: 'hidden',
+                background: '#fff',
+                marginBottom: 4,
+              }}>
+                {statuses.map((s, i) => {
+                  const n = jobs.filter(j => j.status === s.name).length
+                  const active = s.name === mobileStatus
+                  const ink = active ? getContrastYIQ(s.color) : '#475569'
+                  return (
+                    <button key={s.id} onClick={() => setMobileStatus(s.name)} style={{
+                      minWidth: 0, padding: '9px 6px', cursor: 'pointer',
+                      border: 'none',
+                      borderLeft: i === 0 ? 'none' : '1px solid #dbe3ec',
+                      background: active ? s.color : '#fff',
+                      color: ink,
+                      fontFamily: 'inherit',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                    }}>
+                      <span style={{
+                        display: 'flex', alignItems: 'center', gap: 5, maxWidth: '100%',
+                        fontSize: 13, fontWeight: 700,
+                      }}>
+                        {!active && <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.color, flexShrink: 0 }} />}
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+                      </span>
+                      <span style={{ fontSize: 12, fontWeight: 700, opacity: active ? 0.85 : 0.55 }}>{n}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* สรุปสถานะที่เลือก + จัดการสถานะ */}
+              {cur && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, margin: '8px 2px 14px' }}>
+                  <span style={{ fontSize: 13, color: '#64748b' }}>
+                    <strong style={{ color: '#0f172a' }}>{curJobs.length}</strong> งาน
+                    {curTotal > 0 && <> · รวม <strong style={{ color: '#0f172a' }}>{fmtPriceTH(curTotal)}</strong></>}
+                  </span>
+                  <span style={{ display: 'flex', gap: 4 }}>
+                    <button onClick={() => openEditStatus(cur)} aria-label="แก้ไขสถานะ" style={{ width: 38, height: 38, borderRadius: 9, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Pencil size={15} /></button>
+                    <button onClick={() => deleteStatus(cur)} aria-label="ลบสถานะ" style={{ width: 38, height: 38, borderRadius: 9, border: '1px solid #fecaca', background: '#fef2f2', color: '#dc2626', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={15} /></button>
+                  </span>
+                </div>
+              )}
+
+              {/* รายการงานของสถานะนี้ */}
+              {curJobs.length === 0 ? (
+                <button onClick={() => openAdd(mobileStatus)} style={{
+                  width: '100%', padding: '36px 16px', borderRadius: 12,
+                  border: '1px dashed #d7dfe9', background: '#fff', color: '#94a3b8',
+                  fontSize: 14, cursor: 'pointer', fontFamily: 'inherit',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+                }}>
+                  <Plus size={20} /> ยังไม่มีงานในขั้นตอนนี้
+                </button>
+              ) : curJobs.map(j => (
+                <MobileJobCard
+                  key={j.id}
+                  job={j}
+                  statusColor={cur?.color || '#e2e8f0'}
+                  onEdit={() => openEdit(j)}
+                  onDelete={() => del(j)}
+                  onViewNote={() => setShowNoteModal(j)}
+                  onPrintReceipt={isFinal ? () => printReceipt(j) : undefined}
+                  onViewCover={() => j.cover_image_url && setCoverLightbox(j.cover_image_url)}
+                  onMove={isFinal ? undefined : () => setMovePicker(j)}
+                />
+              ))}
+            </div>
+          )
+        })()
+      ) : (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          <div className="kanban-board" style={{ display: 'flex', gap: 20, minWidth: 'min-content', overflowX: 'auto', paddingBottom: 20, scrollSnapType: 'x mandatory' }}>
+          <div ref={boardRef} onScroll={handleBoardScroll} data-h2c-skip className="kanban-board" style={{ display: 'flex', gap: 20, minWidth: 'min-content', overflowX: 'auto', paddingBottom: 20, scrollSnapType: 'x mandatory' }}>
             <SortableContext items={statuses.map(s => `col-${s.id}`)} strategy={horizontalListSortingStrategy}>
               {statuses.map((col) => {
                 const colJobs = jobs.filter(j => j.status === col.name)
                 return (
-                  <div key={col.id} style={{ scrollSnapAlign: 'start' }}>
+                  <div key={col.id} className="kanban-column" style={{ scrollSnapAlign: 'start' }}>
                     <SortableColumn 
                       col={col} 
                       onEdit={() => openEditStatus(col)}
@@ -489,7 +807,17 @@ export default function JobsPage() {
               })}
             </SortableContext>
           </div>
-          
+
+          {/* จุดบอกตำแหน่ง — แสดงเฉพาะมือถือ (CSS ซ่อนบนจอใหญ่)
+              บอกว่ากำลังดูคอลัมน์ที่เท่าไหร่จากทั้งหมดกี่คอลัมน์ */}
+          {statuses.length > 1 && (
+            <div className="kanban-dots">
+              {statuses.map((s, i) => (
+                <span key={s.id} className={`dot${i === activeCol ? ' active' : ''}`} />
+              ))}
+            </div>
+          )}
+
           <DragOverlay>
             {activeItem?.type === 'Column' && activeItem.col ? (
               <SortableColumn col={activeItem.col} onEdit={()=>{}} onDelete={()=>{}}>
@@ -500,6 +828,46 @@ export default function JobsPage() {
             ) : null}
           </DragOverlay>
         </DndContext>
+      )}
+
+      {/* เลือกสถานะปลายทาง (มือถือ) → ส่งต่อให้ modal ระบุผู้ดำเนินการเดิม */}
+      {movePicker && (
+        <div className="modal-overlay" onClick={() => setMovePicker(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <h3 style={{ marginBottom: 6 }}>ย้ายไปสถานะ</h3>
+            <p className="job-text" style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 18 }}>{movePicker.title}</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {statuses.map(s => {
+                const isCurrent = s.name === movePicker.status
+                return (
+                  <button
+                    key={s.id}
+                    disabled={isCurrent}
+                    onClick={() => {
+                      setPendingMove({ jobId: movePicker.id, targetStatus: s.name, currentAssignee: movePicker.assignee_text || '' })
+                      setMoveAssignee(movePicker.assignee_text || '')
+                      setMovePicker(null)
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '0 14px', minHeight: 52, borderRadius: 10,
+                      border: `1px solid ${isCurrent ? '#e2e8f0' : '#dbe3ec'}`,
+                      background: isCurrent ? '#f8fafc' : '#fff',
+                      color: isCurrent ? '#94a3b8' : '#0f172a',
+                      fontSize: 15, fontWeight: 600, fontFamily: 'inherit',
+                      cursor: isCurrent ? 'default' : 'pointer', textAlign: 'left',
+                    }}
+                  >
+                    <span style={{ width: 12, height: 12, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                    <span style={{ flex: 1 }}>{s.name}</span>
+                    {isCurrent && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12 }}><Check size={14} /> อยู่ตรงนี้</span>}
+                  </button>
+                )
+              })}
+            </div>
+            <button className="btn" onClick={() => setMovePicker(null)} style={{ width: '100%', minHeight: 44, marginTop: 18, justifyContent: 'center' }}>ยกเลิก</button>
+          </div>
+        </div>
       )}
 
       {pendingMove && (
@@ -625,7 +993,12 @@ export default function JobsPage() {
       )}
 
       {printReceiptJob && (
-        <div style={{ position: 'fixed', left: '-9999px', top: 0 }}>
+        /* วางที่พิกัด 0,0 จริง แต่ซ่อนด้วย visibility — html2canvas คำนวณกรอบ
+           จากตำแหน่งจริงของ element ถ้าไปวางไว้ที่ -9999px มันจะ crop
+           ผิดตำแหน่งจนได้ canvas ยักษ์แล้วค้าง
+           (visibility:hidden ยังมี layout จึงวัดขนาดได้ปกติ ต่างจาก display:none
+            แล้วค่อยเปิดให้มองเห็นเฉพาะในสำเนาที่ html2canvas ใช้ ผ่าน onclone) */
+        <div id="receipt-root" style={{ position: 'fixed', top: 0, left: 0, zIndex: -1, visibility: 'hidden', pointerEvents: 'none' }}>
           <div ref={receiptRef} style={{
             fontFamily: "'Sarabun', sans-serif",
             width: 794, padding: '40px 50px', background: 'white', color: 'black', fontSize: 14, lineHeight: 1.6,

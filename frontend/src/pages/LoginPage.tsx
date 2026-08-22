@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { Printer } from 'lucide-react'
+import { Printer, Eye, EyeOff } from 'lucide-react'
 
 export default function LoginPage() {
   const { login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -74,16 +75,32 @@ export default function LoginPage() {
           </div>
           <div className="form-group" style={{ textAlign: 'center' }}>
             <label className="form-label" style={{ textAlign: 'center', display: 'block' }}>รหัสผ่าน</label>
-            <input
-              id="login-password"
-              className="form-input"
-              style={{ textAlign: 'center' }}
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                id="login-password"
+                className="form-input"
+                style={{ textAlign: 'center', paddingLeft: 40, paddingRight: 40 }}
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                title={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                style={{
+                  position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'none', border: 'none', padding: 4, cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
+              </button>
+            </div>
           </div>
 
           {error && (

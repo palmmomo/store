@@ -577,9 +577,11 @@ textarea.form-input { resize: vertical; min-height: 80px; }
   /* Transaction form */
   .transaction-form { grid-template-columns: 1fr; }
 
-  /* Tables */
+  /* Tables — ตารางที่แปลงเป็นการ์ด (.responsive-table) ต้องไม่ถูกบังคับ
+     min-width มิฉะนั้นจะกลับมาเลื่อนซ้ายขวาเหมือนเดิม */
   .table-wrapper { overflow-x: auto; }
-  table { min-width: 500px; }
+  table:not(.responsive-table) { min-width: 500px; }
+  .responsive-table { min-width: 0; width: 100%; }
 
   /* Modal */
   .modal { width: 95%; padding: 20px; }
@@ -691,8 +693,11 @@ textarea.form-input { resize: vertical; min-height: 80px; }
 
 /* Responsive: 2-column grid stacks on mobile */
 @media (max-width: 768px) {
-  div[style*="gridTemplateColumns: '1fr 1fr'"],
-  div[style*="grid-template-columns"] {
+  /* ยุบเฉพาะ grid 2 คอลัมน์ตายตัวเท่านั้น
+     ของเดิมจับ [style*="grid-template-columns"] ทั้งหมด เลยไปทับ
+     repeat(auto-fit, minmax(...)) ที่ปรับตัวเองตามจอได้อยู่แล้ว
+     (ตัว selector camelCase เดิมไม่เคย match เพราะ DOM เก็บเป็น kebab-case) */
+  div[style*="grid-template-columns: 1fr 1fr"] {
     grid-template-columns: 1fr !important;
   }
 }
@@ -790,13 +795,13 @@ textarea.form-input { resize: vertical; min-height: 80px; }
     max-width: 100vw;
   }
 
-  .main-content,
-  [class*="main"],
-  [class*="content"] {
-    margin-left: 0 !important;
-    width: 100% !important;
-    max-width: 100vw !important;
-    padding: 16px !important;
+  /* เจาะจงเฉพาะ layout จริง — ของเดิมใช้ [class*="content"] ซึ่งไป
+     ทับ .modal-content และล้าง padding บนของ .page-content ที่เว้นไว้
+     ให้ปุ่มแฮมเบอร์เกอร์ ทำให้ปุ่มทับหัวข้อทุกหน้า */
+  .main-content {
+    margin-left: 0;
+    width: 100%;
+    max-width: 100vw;
   }
 
   .sidebar {
@@ -1289,4 +1294,151 @@ textarea.form-input { resize: vertical; min-height: 80px; }
   border-radius: 8px;
   background: var(--bg-elevated);
   flex-shrink: 0;
+}
+
+/* หน้าที่ต้องการพื้นหลังเต็มความกว้าง (การดำเนินงาน, บิล)
+   ดึงขอบออกไปชนขอบจอ แล้วใส่ padding กลับเข้ามาเท่าเดิม
+   ค่าต้องตรงกับ padding ของ .page-content เป๊ะๆ ไม่งั้นจะล้นจอ */
+.bleed-page {
+  margin: -28px -32px;
+  padding: 28px 32px 40px;
+}
+@media (max-width: 900px) {
+  .bleed-page { margin: -20px -20px; padding: 20px 20px 40px; }
+}
+
+/* ============================================================
+   MOBILE FIT — ให้สัดส่วนพอดีกับจอจริงของแต่ละรุ่น
+   ครอบคลุม iPhone SE (320px) → Pro Max (430px) → Android จอใหญ่
+   บล็อกนี้อยู่ท้ายไฟล์ จึงชนะกฎเดิมที่ specificity เท่ากัน
+   ============================================================ */
+
+:root {
+  /* 100vh บนมือถือนับรวมแถบ URL ที่ยุบ/ขยายได้ เนื้อหาจึงล้นออกนอกจอ
+     dvh วัดพื้นที่ที่มองเห็นจริง — มี fallback ให้เบราว์เซอร์เก่า */
+  --app-h: 100vh;
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+}
+@supports (height: 100dvh) {
+  :root { --app-h: 100dvh; }
+}
+
+@media (max-width: 768px) {
+  /* ---- ระยะขอบยืดตามความกว้างจอ: 320px→12px, 430px→17px ---- */
+  .page-content {
+    width: 100%;
+    max-width: 100vw;
+    padding-top: calc(58px + var(--safe-t));
+    padding-right: clamp(12px, 4vw, 20px);
+    padding-bottom: calc(24px + var(--safe-b));
+    padding-left: clamp(12px, 4vw, 20px);
+  }
+
+  /* ปุ่มแฮมเบอร์เกอร์ — หลบติ่ง/แถบสถานะ และขยายให้ถึง 44px ตามเกณฑ์ tap target */
+  .mobile-menu-btn {
+    top: calc(10px + var(--safe-t));
+    left: calc(10px + var(--safe-l));
+    width: 44px;
+    height: 44px;
+  }
+
+  /* ---- กัน iOS ซูมหน้าจอเองตอนแตะช่องกรอก ----
+     Safari จะซูมทันทีถ้า font-size ของ input ต่ำกว่า 16px
+     (เดิม .form-input = 13px จึงซูมทุกฟอร์มทั้งแอป) */
+  .form-input,
+  input, select, textarea {
+    font-size: 16px;
+  }
+
+  /* ---- ความสูงอิงจอจริง ---- */
+  .app-layout { min-height: var(--app-h); }
+  .main-content { min-height: var(--app-h); }
+  .sidebar {
+    height: var(--app-h);
+    padding-top: var(--safe-t);
+    padding-bottom: var(--safe-b);
+  }
+
+  /* ---- การ์ดสรุป: จำนวนคอลัมน์ปรับเองตามความกว้างที่มี ----
+     จอ 320px ได้ 1 ใบ / จอ 390px+ ได้ 2 ใบ โดยไม่ต้องเพิ่ม breakpoint */
+  .stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+    gap: 12px;
+  }
+
+  /* ---- Bottom sheet: เว้นแถบ home indicator ไม่ให้ปุ่มโดนบัง ---- */
+  .modal-content {
+    max-height: 88dvh;
+    padding: 20px clamp(14px, 4vw, 20px) calc(20px + var(--safe-b));
+  }
+
+  /* ---- ตัวอักษรย่อ/ขยายตามจอ ไม่ให้ล้นบรรทัดบนจอแคบ ---- */
+  .page-header h2 { font-size: clamp(17px, 5vw, 21px); }
+  .stat-value { font-size: clamp(17px, 5.2vw, 22px); }
+
+  /* ---- ปุ่มไอคอนเล็ก: ขยายพื้นที่กดโดยไม่ขยายตัวไอคอน ---- */
+  .btn-icon { min-width: 40px; min-height: 40px; }
+
+  /* ---- Kanban: 1 คอลัมน์เต็มจอ + เลื่อนทีละคอลัมน์ ----
+     ปัญหาเดิม: บอร์ดตั้ง minWidth:'min-content' ไว้ inline ทำให้บอร์ด
+     กว้างเท่าผลรวมทุกคอลัมน์ overflowX:auto เลยไม่ทำงาน กลายเป็น
+     ทั้งหน้าล้นออกนอกจอ แล้วโดน overflow-x:hidden ที่ body ตัดทิ้ง
+     (ข้อความในการ์ดจึงโดนตัด และปุ่ม + หลุดออกนอกจอ) */
+  .kanban-board {
+    min-width: 0 !important;
+    width: 100%;
+    max-width: 100%;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  /* กว้างเท่ากรอบบอร์ดพอดีเสมอ — ไม่เดาจาก 100vw ซึ่งไม่รู้จัก padding จริง */
+  .kanban-column {
+    flex: 0 0 100%;
+    min-width: 100%;
+    max-width: 100%;
+    scroll-snap-align: start;
+  }
+  .kanban-column > * {
+    min-width: 0 !important;
+    width: 100%;
+  }
+
+  /* ข้อความไทยยาวๆ ไม่มีเว้นวรรค จะดันกล่องให้กว้างเกินแล้วโดนตัด
+     บังคับให้ตัดบรรทัดแทน (flex item ต้อง min-width:0 ถึงจะยอมหด) */
+  .job-text,
+  .job-text > *,
+  .job-text span { min-width: 0; overflow-wrap: anywhere; }
+
+  /* ---- หน้าพื้นหลังเต็มจอบนมือถือ ----
+     ไม่ดึงขอบบนขึ้น มิฉะนั้นจะกินพื้นที่ที่กันไว้ให้ปุ่มแฮมเบอร์เกอร์
+     จนหัวข้อโดนปุ่มทับ ส่วนซ้าย-ขวาดึงออกให้ตรงกับ padding ที่ยืดตามจอ */
+  .bleed-page {
+    margin: 0 calc(-1 * clamp(12px, 4vw, 20px));
+    padding: 0 clamp(12px, 4vw, 20px) 32px;
+  }
+
+  /* ---- ตารางที่แปลงเป็นการ์ด ----
+     หลาย <td> ตั้ง width แบบ inline (เช่น width:40 ของคอลัมน์ลำดับ)
+     ซึ่งบีบช่องจนค่าล้นตอนเป็นการ์ด — ปล่อยให้ยืดตามเนื้อหาแทน */
+  .responsive-table tbody td {
+    width: auto !important;
+    gap: 12px;
+    align-items: baseline;
+  }
+  /* ป้ายกำกับไม่ให้ถูกบีบ ค่าไปชิดขวาและตัดบรรทัดได้ */
+  .responsive-table tbody td::before {
+    flex-shrink: 0;
+  }
+  .responsive-table tbody td > * { min-width: 0; }
+}
+
+/* ---- จอแคบพิเศษ (iPhone SE / Android 320–380px) ---- */
+@media (max-width: 380px) {
+  .btn { padding: 8px 12px; font-size: 12px; }
+  .stat-card { padding: 12px 14px; gap: 10px; }
+  .stat-icon { width: 36px; height: 36px; }
+  .stats-grid { grid-template-columns: 1fr; }
 }
